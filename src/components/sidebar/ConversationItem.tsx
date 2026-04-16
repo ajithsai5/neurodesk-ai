@@ -1,7 +1,23 @@
+// File: src/components/sidebar/ConversationItem.tsx
+/**
+ * Conversation Item Component
+ * Renders a single conversation entry in the sidebar with inline rename editing
+ * and a context menu for rename, archive, and delete actions.
+ * (Why: encapsulates per-item UI logic so the Sidebar component stays clean)
+ */
+
 'use client';
 
 import { useState, useRef, useCallback, type KeyboardEvent } from 'react';
 
+// @field id - Conversation UUID for identifying which item to act on
+// @field title - Display title shown in the sidebar
+// @field updatedAt - ISO timestamp for showing relative date
+// @field isActive - Whether this conversation is currently selected
+// @field onSelect - Callback when the item is clicked (navigates to this conversation)
+// @field onRename - Callback with new title when rename is confirmed
+// @field onDelete - Callback to delete this conversation
+// @field onArchive - Callback to toggle archive status
 interface ConversationItemProps {
   id: string;
   title: string;
@@ -13,6 +29,9 @@ interface ConversationItemProps {
   onArchive: (id: string) => void;
 }
 
+// Render a conversation sidebar item with inline editing and context menu
+// Supports: click to select, inline title editing, and 3-dot menu for actions
+// @param props - ConversationItemProps with callbacks for each user action
 export function ConversationItem({
   id,
   title,
@@ -23,18 +42,25 @@ export function ConversationItem({
   onDelete,
   onArchive,
 }: ConversationItemProps) {
+  // State for inline rename editing mode
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(title);
+  // State for the 3-dot context menu visibility
   const [showMenu, setShowMenu] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Enter edit mode: populate input with current title and focus it
+  // (Why: auto-focus provides immediate keyboard input without extra clicks)
   const handleStartEdit = useCallback(() => {
     setEditValue(title);
     setIsEditing(true);
     setShowMenu(false);
+    // setTimeout needed because the input isn't rendered yet during this callback
     setTimeout(() => inputRef.current?.focus(), 0);
   }, [title]);
 
+  // Save the edited title if it changed, then exit edit mode
+  // (Why: only calls onRename if the title actually changed to avoid unnecessary API calls)
   const handleSaveEdit = useCallback(() => {
     const trimmed = editValue.trim();
     if (trimmed && trimmed !== title) {
@@ -43,6 +69,7 @@ export function ConversationItem({
     setIsEditing(false);
   }, [editValue, title, id, onRename]);
 
+  // Handle keyboard events in edit mode: Enter saves, Escape cancels
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Enter') handleSaveEdit();
@@ -51,6 +78,7 @@ export function ConversationItem({
     [handleSaveEdit]
   );
 
+  // Format the updatedAt timestamp as a short date (e.g., "Apr 16")
   const formattedDate = new Date(updatedAt).toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
@@ -64,6 +92,7 @@ export function ConversationItem({
       onClick={() => !isEditing && onSelect(id)}
     >
       <div className="flex-1 min-w-0">
+        {/* Show inline edit input when editing, otherwise show title + date */}
         {isEditing ? (
           <input
             ref={inputRef}
@@ -83,6 +112,7 @@ export function ConversationItem({
         )}
       </div>
 
+      {/* Context menu trigger — only visible on hover, hidden during editing */}
       {!isEditing && (
         <div className="relative">
           <button
@@ -95,6 +125,7 @@ export function ConversationItem({
             &#8942;
           </button>
 
+          {/* Dropdown context menu with Rename, Archive, Delete actions */}
           {showMenu && (
             <div className="absolute right-0 top-6 z-10 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[120px]">
               <button

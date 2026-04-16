@@ -1,23 +1,49 @@
+// File: src/components/sidebar/Sidebar.tsx
+/**
+ * Sidebar Component
+ * Left-side navigation panel showing the conversation list with new conversation button.
+ * Supports switching between active and archived conversation views.
+ * Handles conversation CRUD operations (rename, delete, archive) via API calls.
+ * (Why: provides navigation and conversation management in a persistent sidebar layout)
+ */
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { ConversationItem } from './ConversationItem';
 import type { Conversation } from '@/modules/shared/types';
 
+// @field activeConversationId - Currently selected conversation (highlighted in the list)
+// @field onSelectConversation - Callback when a conversation is clicked
+// @field onNewConversation - Callback when the "New Conversation" button is clicked
 interface SidebarProps {
   activeConversationId: string | null;
   onSelectConversation: (id: string) => void;
   onNewConversation: () => void;
 }
 
+// Render the sidebar with conversation list, new conversation button, and archive toggle
+// Fetches conversations from the API and re-fetches after any mutation
+// @param activeConversationId - ID of the currently selected conversation
+// @param onSelectConversation - Navigate to a conversation
+// @param onNewConversation - Create a new conversation
 export function Sidebar({
   activeConversationId,
   onSelectConversation,
   onNewConversation,
 }: SidebarProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  // Toggle between active and archived conversation views
   const [showArchived, setShowArchived] = useState(false);
 
+  // ============================================
+  // Conversation List & CRUD Handlers
+  // Fetch, rename, delete, and archive conversations via API.
+  // Each handler re-fetches the list after mutation to stay in sync.
+  // ============================================
+
+  // Fetch conversations from the API, filtered by current view (active/archived)
+  // (Why: re-called after any mutation to keep the list in sync with the database)
   const loadConversations = useCallback(async () => {
     const status = showArchived ? 'archived' : 'active';
     const res = await fetch(`/api/conversations?status=${status}`);
@@ -27,10 +53,14 @@ export function Sidebar({
     }
   }, [showArchived]);
 
+  // Load conversations on mount and when the view filter changes
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
 
+  // Rename a conversation via PATCH API, then refresh the list
+  // @param id - Conversation to rename
+  // @param title - New title text
   const handleRename = useCallback(
     async (id: string, title: string) => {
       await fetch(`/api/conversations/${id}`, {
@@ -43,10 +73,15 @@ export function Sidebar({
     [loadConversations]
   );
 
+  // Delete a conversation via DELETE API, then refresh the list
+  // Clears active selection if the deleted conversation was selected
+  // @param id - Conversation to delete
   const handleDelete = useCallback(
     async (id: string) => {
       await fetch(`/api/conversations/${id}`, { method: 'DELETE' });
       loadConversations();
+      // Clear selection if the deleted conversation was active
+      // (Why: prevents showing a stale conversation that no longer exists)
       if (id === activeConversationId) {
         onSelectConversation('');
       }
@@ -54,8 +89,12 @@ export function Sidebar({
     [loadConversations, activeConversationId, onSelectConversation]
   );
 
+  // Toggle archive status via POST API, then refresh the list
+  // Archives active conversations, restores archived ones
+  // @param id - Conversation to archive/restore
   const handleArchive = useCallback(
     async (id: string) => {
+      // If viewing archived conversations, the action is "restore" (archived: false)
       const isArchived = showArchived;
       await fetch(`/api/conversations/${id}/archive`, {
         method: 'POST',
@@ -63,6 +102,8 @@ export function Sidebar({
         body: JSON.stringify({ archived: !isArchived }),
       });
       loadConversations();
+      // Clear selection if the archived conversation was active
+      // (Why: archived conversations leave the active view, so selection should clear)
       if (id === activeConversationId) {
         onSelectConversation('');
       }
@@ -72,7 +113,7 @@ export function Sidebar({
 
   return (
     <aside className="w-[280px] h-full bg-white border-r border-slate-200 flex flex-col">
-      {/* Header */}
+      {/* Header with new conversation button */}
       <div className="p-4 border-b border-slate-200">
         <button
           onClick={onNewConversation}
@@ -82,7 +123,7 @@ export function Sidebar({
         </button>
       </div>
 
-      {/* Conversation List */}
+      {/* Scrollable conversation list */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-thin">
         {conversations.length === 0 ? (
           <p className="text-sm text-slate-400 text-center py-4">
@@ -105,7 +146,7 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Archive Toggle */}
+      {/* Footer toggle between active and archived views */}
       <div className="p-3 border-t border-slate-200">
         <button
           onClick={() => setShowArchived(!showArchived)}

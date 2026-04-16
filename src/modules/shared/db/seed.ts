@@ -1,3 +1,12 @@
+// File: src/modules/shared/db/seed.ts
+/**
+ * Database Seeding Script
+ * Populates the database with default personas and provider configurations.
+ * Only inserts data when the respective tables are empty (idempotent).
+ * Run via: npm run db:seed
+ * (Why: provides sensible defaults so the app works immediately after setup)
+ */
+
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import path from 'path';
@@ -8,7 +17,8 @@ import { count } from 'drizzle-orm';
 
 const DB_PATH = path.join(process.cwd(), 'data', 'neurodesk.db');
 
-// Ensure data directory exists
+// Ensure data directory exists before opening DB
+// (Why: better-sqlite3 will fail if the parent directory doesn't exist)
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 
 const sqlite = new Database(DB_PATH);
@@ -17,8 +27,12 @@ sqlite.pragma('foreign_keys = ON');
 
 const db = drizzle(sqlite);
 
+// Seed the database with default personas and providers
+// Checks each table for existing data before inserting to prevent duplicates
+// (Why: makes the script safe to run multiple times without side effects)
 async function seed() {
   // Seed personas if none exist
+  // (Why: app requires at least one persona for conversation creation)
   const [personaCount] = await db.select({ value: count() }).from(personas);
   if (personaCount.value === 0) {
     await db.insert(personas).values([
@@ -51,6 +65,7 @@ async function seed() {
   }
 
   // Seed provider configs if none exist
+  // (Why: app requires at least one available provider to stream LLM responses)
   const [providerCount] = await db.select({ value: count() }).from(providerConfigs);
   if (providerCount.value === 0) {
     await db.insert(providerConfigs).values([
@@ -74,6 +89,8 @@ async function seed() {
     console.log('Seeded 2 provider configs');
   }
 
+  // Close the connection after seeding
+  // (Why: this is a standalone script, not the app's long-lived connection)
   sqlite.close();
   console.log('Seed complete');
 }
