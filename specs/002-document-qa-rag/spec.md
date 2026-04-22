@@ -3,7 +3,22 @@
 **Feature Branch**: `002-document-qa-rag`
 **Created**: 2026-04-16
 **Status**: Draft
-**Input**: User description: "Upload any PDF and ask natural language questions about it. The system retrieves the most relevant sections and generates grounded answers with page-level source citations. Pipeline: PDF → text extraction → overlapping chunks → embeddings → vector store → similarity search → LLM answer with citations. Supports cloud LLMs (OpenAI, Azure OpenAI, Anthropic) and local LLMs (Ollama). Reuses the shared chat shell from Feature 01."
+**Input**: User description: "Upload any PDF and ask natural language questions about it. The system retrieves the most relevant sections and generates grounded answers with page-level source citations. Pipeline: PDF → text extraction → overlapping chunks → embeddings → vector store → similarity search → LLM answer with citations. Supports cloud LLMs (OpenAI, Azure OpenAI, Anthropic) and local LLMs (Ollama — `llama3.1:8b` for generation, `nomic-embed-text` for embeddings). Reuses the shared chat shell from Feature 01."
+
+## Clarifications
+
+### Session 2026-04-22
+
+- Q: When the user switches LLM provider mid-conversation, how should the system handle the embedding model mismatch? → A: Fixed embedding model per conversation — chosen at first document upload, never changes even if the LLM provider switches.
+- Q: Is this a single-user system, or must uploaded documents be isolated per authenticated user? → A: Single-user local tool — one user, no authentication required; all conversations and documents belong to that user.
+- Q: When a user asks a question before any document is uploaded, what should happen? → A: Regular chat fallback — system answers from LLM knowledge with no document context; document Q&A activates automatically once a document is uploaded.
+- Q: Are uploaded documents scoped to the conversation they were uploaded in, or accessible across all conversations? → A: User-global library — all uploaded documents are available across all conversations; any document from any past upload can be referenced from any conversation.
+- Q: Can the user delete documents from the library? → A: Yes, with permanent deletion — user can remove a document; the file and its vector index are deleted.
+- Q: What local vector store technology should be used to persist embeddings? → A: `sqlite-vec` (SQLite vector extension) — reuses the existing SQLite database file, keeping the stack minimal with zero new infrastructure.
+- Q: What should happen when a user uploads a file that already exists in the library? → A: Deduplicate by content hash — if an identical file is already in the library, skip processing and notify the user; no duplicate entry is created.
+- Q: What chunk size and overlap should the text splitter use? → A: 512 tokens per chunk, 64 token overlap — balanced for `nomic-embed-text` and prevents context loss at chunk boundaries.
+- Q: When document processing fails, can the user retry in-place or must they re-upload? → A: No retry — system marks the document as `failed` with a visible error state; the user must delete the entry and re-upload the file.
+- Q: How many chunks should be retrieved from the vector index per query? → A: Top 5 chunks — ~2,560 tokens of context, fits comfortably within `llama3.1:8b`'s 8K context window.
 
 ## User Scenarios & Testing
 
@@ -86,18 +101,22 @@ A user uploads documents in formats beyond PDF (e.g., plain text, Markdown). The
 
 ### Edge Cases
 
+- What happens when a user uploads a file that is already in the library (identical content)?
+  The system computes a SHA-256 hash on upload. If a matching hash is found, processing is skipped and the user sees "Document already in library." No duplicate entry or vector index entry is created.
 - What happens when a user uploads an empty PDF (0 text content, only images)?
   The system informs the user that no extractable text was found and suggests uploading a text-based PDF.
 - What happens when a user uploads a very large PDF (500+ pages)?
   The system enforces a file size and page count limit, rejecting documents that exceed the threshold with a clear error message.
 - What happens when the user asks a question before any document is uploaded?
-  The system responds with regular chat behavior (no document context), or prompts the user to upload a document first if in a document-specific mode.
+  The system responds with regular LLM chat behavior (no document context). Document Q&A activates automatically once at least one document has been successfully processed in the conversation. No "document mode" toggle is required.
 - How does the system handle scanned PDFs (image-only, no selectable text)?
   v1 does not include OCR. The system detects image-only pages and informs the user that text extraction is not possible for scanned documents.
 - What happens if the vector store or embedding service is unavailable?
   The system returns a user-friendly error indicating that document search is temporarily unavailable, without exposing internal details.
-- What happens when two documents are uploaded to the same conversation?
-  The system indexes both documents and searches across all uploaded documents when answering questions, citing which document and page each passage comes from.
+- What happens when document processing fails partway through (e.g., embedding error on chunk 47 of 200)?
+  The system marks the document as `failed`, stores the error message (e.g., "Embedding failed: Ollama unreachable"), and displays it in the document library. No partial vector index is kept. The user must delete the failed entry and re-upload — there is no in-place retry.
+- What happens when multiple documents exist in the user's library?
+  The system searches across all documents in the library when answering questions, citing the document name and page number for each retrieved passage.
 
 ## Requirements
 
@@ -105,23 +124,28 @@ A user uploads documents in formats beyond PDF (e.g., plain text, Markdown). The
 
 - **FR-001**: System MUST accept PDF file uploads from the user through the chat interface.
 - **FR-002**: System MUST extract text content from uploaded PDFs while preserving page-level boundaries.
-- **FR-003**: System MUST split extracted text into overlapping chunks suitable for semantic search.
-- **FR-004**: System MUST generate vector embeddings for each text chunk and store them in a searchable index.
-- **FR-005**: When the user asks a question, the system MUST retrieve the most relevant chunks from the vector index using similarity search.
+- **FR-003**: System MUST split extracted text into overlapping chunks of **512 tokens** with a **64-token overlap**, measured using the same `cl100k_base` tokenizer already used by the context window module.
+- **FR-004**: System MUST generate vector embeddings for each text chunk and store them in a searchable index using `sqlite-vec` within the existing SQLite database (`data/neurodesk.db`).
+- **FR-005**: When the user asks a question, the system MUST retrieve the top **5** most relevant chunks from the vector index using cosine similarity search and inject them into the LLM prompt as document context.
 - **FR-006**: System MUST generate answers that are grounded in the retrieved document content, not general knowledge.
 - **FR-007**: Every answer MUST include page-level source citations indicating where the information was found.
 - **FR-008**: System MUST clearly state when a question cannot be answered from the uploaded document(s).
 - **FR-009**: System MUST support switching between cloud LLM providers (OpenAI, Anthropic) and local LLM providers (Ollama) using the existing model switcher UI.
-- **FR-010**: When a local LLM provider is selected, all processing (embeddings and answer generation) MUST occur locally with no external API calls.
-- **FR-011**: System MUST support uploading multiple documents to a single conversation and search across all of them.
+- **FR-010**: When a local LLM provider is selected, all processing MUST occur locally with no external API calls. Generation MUST use Ollama `llama3.1:8b`; embeddings MUST use Ollama `nomic-embed-text`.
+- **FR-011**: System MUST maintain a user-global document library; all uploaded documents are accessible from any conversation without re-uploading.
+- **FR-011a**: When answering a question, the system MUST search across all documents in the user's library and cite which document and page each retrieved passage comes from.
 - **FR-012**: System MUST enforce file size limits and supported format validation on uploads.
+- **FR-012a**: System MUST compute a content hash (SHA-256) for each uploaded file. If a file with the same hash already exists in the library, the upload MUST be rejected with a user-facing notice ("Document already in library") and no duplicate entry or vector index is created.
 - **FR-013**: System MUST support at minimum PDF and plain text (.txt) file formats.
 - **FR-014**: System MUST persist uploaded documents and their vector indices so they survive page refreshes and server restarts.
 - **FR-015**: System MUST integrate with the existing conversation and chat infrastructure from Feature 01.
+- **FR-016**: The embedding model used to index a conversation's documents MUST remain fixed for the lifetime of that conversation; switching LLM providers MUST NOT trigger re-embedding or invalidate the existing vector index.
+- **FR-017**: When no document has been uploaded to a conversation, the system MUST respond to user messages using standard LLM chat behavior (no document retrieval). Document Q&A MUST activate automatically once at least one document has been successfully processed.
+- **FR-018**: Users MUST be able to permanently delete a document from the library. Deletion MUST remove both the stored file and its vector index from disk.
 
 ### Key Entities
 
-- **Document**: An uploaded file associated with a conversation. Key attributes: original filename, file format, file size, page count, processing status (pending/ready/failed), upload timestamp.
+- **Document**: An uploaded file stored in the user's global document library, accessible from all conversations. Key attributes: original filename, file format, file size, page count, processing status (pending/ready/failed), upload timestamp, SHA-256 content hash (unique, used for deduplication), error message (populated on failure). Lifecycle: pending → ready (on successful processing) or failed (on error, with error message displayed); permanently deleted on user request (file and vector index removed). No in-place retry — user must delete a failed entry and re-upload.
 - **Document Chunk**: A segment of extracted text from a document. Key attributes: text content, page number, chunk position, parent document reference.
 - **Chunk Embedding**: A vector representation of a document chunk stored in the search index. Key attributes: vector data, reference to source chunk.
 - **Citation**: A reference linking an answer passage to a specific document chunk. Key attributes: document name, page number, source text excerpt.
@@ -140,13 +164,17 @@ A user uploads documents in formats beyond PDF (e.g., plain text, Markdown). The
 
 ## Assumptions
 
+- This is a single-user local tool — no user authentication is required, and all conversations and documents belong to a single operator. Multi-user isolation is out of scope for v1.
 - Users have a modern web browser with file upload support (drag-and-drop or file picker).
 - PDF documents contain selectable text (not scanned images). OCR support is out of scope for v1.
-- Users running local LLMs have Ollama installed and at least one model pulled (e.g., llama3 or mistral).
+- Users running local LLMs have Ollama installed with `llama3.1:8b` pulled for generation and `nomic-embed-text` pulled for embeddings. Local Ollama model files are stored at `G:\Ollama\Model`.
 - The existing chat interface and conversation model from Feature 01 will be extended, not replaced.
-- Embedding models for local mode will use open-source sentence-transformer models bundled or pulled via Ollama.
-- Cloud embedding APIs (OpenAI embeddings) are used when a cloud provider is selected.
+- The embedding model used to index a conversation's documents is chosen at the time of first upload and remains fixed for that conversation's lifetime, regardless of subsequent LLM provider switches.
+- Local embeddings use Ollama's `nomic-embed-text` model. When only cloud providers are configured, embeddings use the cloud provider's embedding API (e.g., OpenAI embeddings).
 - File storage for uploaded documents uses the local filesystem (not cloud storage) in v1.
-- The vector index is stored locally (not a managed cloud service) in v1.
-- Maximum concurrent document processing is 1 document at a time per conversation in v1.
+- The vector index is stored locally using `sqlite-vec` (SQLite vector extension) within the same database file (`data/neurodesk.db`) — no separate vector database process or infrastructure required.
+- Documents are stored in a user-global library and are accessible from any conversation without re-uploading.
+- Text chunking uses 512-token chunks with 64-token overlap, tokenized with `cl100k_base` (reusing `js-tiktoken` already in the project).
+- Retrieval returns the top 5 chunks per query (~2,560 tokens), leaving sufficient headroom in `llama3.1:8b`'s 8K context window for conversation history and system prompt.
+- Maximum concurrent document processing is 1 document at a time in v1.
 - Azure OpenAI support follows the same interface as standard OpenAI (compatible SDK).
