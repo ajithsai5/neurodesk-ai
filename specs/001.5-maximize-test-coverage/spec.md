@@ -318,9 +318,9 @@ resolves to the correct percentage.
 - The existing `vi.mock` patterns in
   `__tests__/modules/chat/context-window.test.ts` serve as the canonical
   mocking reference for new tests.
-- The 21 previously skipped integration tests referenced in the task list
-  exist in the repository with `it.skip` or `describe.skip` markers and
-  will be un-skipped as part of this sprint.
+- The integration test placeholders in `__tests__/integration/` use
+  `it.todo()` markers (not `it.skip`). All todos must be replaced with
+  full working implementations — they cannot simply be un-skipped.
 - Coverage badge hosting is via a static shield (e.g., shields.io with a
   JSON endpoint or a pre-built badge URL) — no external service integration
   is required in this sprint.
