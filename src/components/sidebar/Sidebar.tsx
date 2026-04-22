@@ -11,6 +11,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { ConversationItem } from './ConversationItem';
+import { DocumentLibrary } from '@/components/DocumentLibrary';
+import { DocumentUpload } from '@/components/DocumentUpload';
 import type { Conversation } from '@/modules/shared/types';
 
 // @field activeConversationId - Currently selected conversation (highlighted in the list)
@@ -35,6 +37,9 @@ export function Sidebar({
   const [conversations, setConversations] = useState<Conversation[]>([]);
   // Toggle between active and archived conversation views
   const [showArchived, setShowArchived] = useState(false);
+  // Toggle document panel visibility; key used to refresh library after upload
+  const [showDocs, setShowDocs] = useState(false);
+  const [docRefreshKey, setDocRefreshKey] = useState(0);
 
   // ============================================
   // Conversation List & CRUD Handlers
@@ -143,6 +148,23 @@ export function Sidebar({
               onArchive={handleArchive}
             />
           ))
+        )}
+      </div>
+
+      {/* Document Library — collapsible panel above the footer */}
+      <div className="border-t border-slate-200">
+        <button
+          onClick={() => setShowDocs((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-50 transition-colors"
+        >
+          <span className="font-medium">Documents</span>
+          <span className="text-slate-400 text-xs">{showDocs ? '▲' : '▼'}</span>
+        </button>
+        {showDocs && (
+          <div className="pb-2">
+            <DocumentUpload onUploaded={() => setDocRefreshKey((k) => k + 1)} />
+            <DocumentLibrary refreshKey={docRefreshKey} />
+          </div>
         )}
       </div>
 

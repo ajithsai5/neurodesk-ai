@@ -23,10 +23,11 @@ export class EmbeddingError extends Error {
  * Generate a 768-dimensional embedding vector for the given text using
  * Ollama's nomic-embed-text model.
  * @param text - The text to embed (should be ≤ 512 tokens for best results)
+ * @param signal - Optional AbortSignal (e.g. AbortSignal.timeout(5000) for the pre-flight check)
  * @returns A 768-element float array representing the text's semantic vector
- * @throws EmbeddingError if Ollama is unreachable or returns an invalid response
+ * @throws EmbeddingError if Ollama is unreachable, times out, or returns an invalid response
  */
-export async function generateEmbedding(text: string): Promise<number[]> {
+export async function generateEmbedding(text: string, signal?: AbortSignal): Promise<number[]> {
   let response: Response;
 
   try {
@@ -34,8 +35,15 @@ export async function generateEmbedding(text: string): Promise<number[]> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: EMBEDDING_MODEL, input: text }),
+      signal,
     });
   } catch (cause) {
+    // AbortError means the timeout fired — surface a clear message
+    if (cause instanceof Error && cause.name === 'AbortError') {
+      throw new EmbeddingError(
+        `Ollama unreachable at ${OLLAMA_BASE_URL}: request timed out. Ensure Ollama is running with: ollama serve`
+      );
+    }
     throw new EmbeddingError(
       `Ollama unreachable at ${OLLAMA_BASE_URL}. Ensure Ollama is running with: ollama serve`
     );

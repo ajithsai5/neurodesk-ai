@@ -6,13 +6,26 @@
  * (Why: page granularity is required for accurate source citations in RAG answers)
  */
 
-// pdf-parse uses CommonJS exports; use require-style import for compatibility
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require('pdf-parse') as (buffer: Buffer) => Promise<{ text: string; numpages: number }>;
-
 export interface ExtractedPage {
   pageNumber: number; // 1-indexed
   text: string;
+}
+
+type PdfParseResult = { text: string; numpages: number };
+
+/**
+ * Dynamically load pdf-parse, handling both CJS and ESM interop shapes.
+ * Using dynamic import inside the function ensures correct module resolution
+ * in both Next.js (Webpack) and Vitest (Vite/ESM) environments.
+ */
+async function loadPdfParse(): Promise<(buffer: Buffer) => Promise<PdfParseResult>> {
+  const mod = await import('pdf-parse');
+  // pdf-parse may land as the default export or as the module itself
+  const fn = (mod as unknown as { default: unknown }).default ?? mod;
+  if (typeof fn !== 'function') {
+    throw new Error('pdf-parse module did not export a callable function');
+  }
+  return fn as (buffer: Buffer) => Promise<PdfParseResult>;
 }
 
 /**
@@ -25,6 +38,7 @@ export interface ExtractedPage {
  * @throws Error if the buffer is not a valid PDF or is corrupt
  */
 export async function extractPages(buffer: Buffer): Promise<ExtractedPage[]> {
+  const pdfParse = await loadPdfParse();
   const result = await pdfParse(buffer);
 
   // pdf-parse separates pages with form-feed (\f); split and index from 1

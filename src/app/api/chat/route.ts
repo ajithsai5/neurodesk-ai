@@ -9,6 +9,7 @@
 import { NextRequest } from 'next/server';
 import { chatInputSchema } from '@/modules/shared/validation';
 import { handleChatMessage } from '@/modules/chat';
+import { listDocuments, retrieveChunks, formatRagContext } from '@/modules/rag';
 import { logger } from '@/modules/shared/logger';
 
 // Handle incoming chat messages and return a streaming AI response
@@ -29,8 +30,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Build RAG context if any ready documents exist (FR-017: skip gracefully when none)
+    let ragContext: string | undefined;
+    try {
+      const docs = await listDocuments();
+      const hasReady = docs.some((d) => d.status === 'ready');
+      if (hasReady) {
+        const chunks = await retrieveChunks(parsed.data.message);
+        ragContext = formatRagContext(chunks) ?? undefined;
+      }
+    } catch (ragErr) {
+      // Ollama unreachable or other retrieval error — proceed without RAG context
+      // (Why: chat must never fail due to an optional RAG step)
+      logger.warn('RAG retrieval skipped', { error: String(ragErr) });
+    }
+
     // Delegate to chat service which handles DB operations, context window, and LLM streaming
-    const result = await handleChatMessage(parsed.data);
+    const result = await handleChatMessage({ ...parsed.data, ragContext });
     // Convert the AI SDK stream result to an SSE response for the useChat hook
     return result.toDataStreamResponse();
   } catch (err) {

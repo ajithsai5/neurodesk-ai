@@ -7,7 +7,15 @@
  */
 
 import { getEncoding } from 'js-tiktoken';
-import type { ExtractedPage } from './pdf-extractor';
+import { eq } from 'drizzle-orm';
+import { db, sqlite } from '@/modules/shared/db';
+import { documentChunks } from '@/modules/shared/db/schema';
+import { extractPages, type ExtractedPage } from './pdf-extractor';
+import { extractTextFile } from './txt-extractor';
+import { generateEmbedding, EmbeddingError } from './embedding-client';
+import { getDocument, updateDocumentStatus } from './document-service';
+import { logger } from '@/modules/shared/logger';
+import fs from 'fs';
 
 // Chunking configuration — matches values confirmed in spec clarifications
 const CHUNK_SIZE_TOKENS = 512;
@@ -82,4 +90,120 @@ export function chunkText(pages: ExtractedPage[]): TextChunk[] {
   }
 
   return chunks;
+}
+
+/**
+ * Run the full ingestion pipeline for a document that is already in 'pending' status.
+ * On success: inserts chunks + embeddings, updates status to 'ready'.
+ * On failure: removes any partial vec rows, updates status to 'failed' with error message.
+ *
+ * This function is intentionally fire-and-forget from the API route (no await at call site).
+ */
+export async function ingestDocument(documentId: number): Promise<void> {
+  const doc = await getDocument(documentId);
+  if (!doc) throw new Error(`Document ${documentId} not found`);
+
+  const startMs = Date.now();
+  logger.info('Ingestion started', { documentId, originalName: doc.originalName });
+
+  // Pre-flight: verify Ollama embedding is reachable before reading the file.
+  // 5-second timeout prevents ingestion from hanging when Ollama is not running.
+  try {
+    await generateEmbedding('ping', AbortSignal.timeout(5000));
+  } catch (err) {
+    const message = err instanceof EmbeddingError
+      ? err.message
+      : `Embedding service error: ${String(err)}`;
+    await updateDocumentStatus(documentId, 'failed', { errorMessage: message });
+    return;
+  }
+
+  try {
+    // 1. Read file from disk
+    const buffer = fs.readFileSync(doc.filePath);
+
+    // 2. Extract text pages — route by MIME type (FR-013 multi-format support)
+    const pages: ExtractedPage[] = doc.mimeType === 'text/plain'
+      ? extractTextFile(buffer)
+      : await extractPages(buffer);
+    if (pages.length === 0) {
+      await updateDocumentStatus(documentId, 'failed', {
+        errorMessage: 'No extractable text found. The document may be image-only or empty.',
+      });
+      return;
+    }
+
+    // 3. Enforce page count limit (200 pages max per spec SC-005)
+    const pageCount = pages.reduce((max, p) => Math.max(max, p.pageNumber), 0);
+    if (pageCount > 200) {
+      await updateDocumentStatus(documentId, 'failed', {
+        errorMessage: `Document exceeds 200-page limit (${pageCount} pages detected).`,
+      });
+      return;
+    }
+
+    // 4. Split into chunks
+    const chunks = chunkText(pages);
+
+    // 5. Embed each chunk and persist to DB + vec table
+    // Track inserted chunk IDs for cleanup on partial failure
+    const insertedChunkIds: number[] = [];
+
+    for (const chunk of chunks) {
+      // Insert the chunk record first to get its autoincrement ID
+      const [chunkRow] = await db
+        .insert(documentChunks)
+        .values({
+          documentId,
+          pageNumber: chunk.pageNumber,
+          chunkIndex: chunk.chunkIndex,
+          content: chunk.content,
+          tokenCount: chunk.tokenCount,
+        })
+        .returning({ id: documentChunks.id });
+
+      const chunkId = chunkRow!.id;
+      insertedChunkIds.push(chunkId);
+
+      // Generate embedding and insert into the sqlite-vec virtual table.
+      // sqlite-vec v0.1.x requires BigInt for the primary key column.
+      const embedding = await generateEmbedding(chunk.content);
+      sqlite.prepare(`
+        INSERT INTO vec_document_chunks (chunk_id, embedding)
+        VALUES (?, ?)
+      `).run(BigInt(chunkId), new Float32Array(embedding));
+    }
+
+    // 6. Mark document as ready with final page count
+    await updateDocumentStatus(documentId, 'ready', { pageCount });
+    logger.info('Ingestion completed', {
+      documentId,
+      chunks: chunks.length,
+      pageCount,
+      durationMs: Date.now() - startMs,
+    });
+  } catch (err) {
+    // On any error: clean up any partial vec rows and mark as failed
+    const message = err instanceof EmbeddingError
+      ? err.message
+      : `Processing failed: ${err instanceof Error ? err.message : String(err)}`;
+
+    // Remove partial vec entries (chunks are cascade-deleted with the document row, but
+    // we want to leave the document record so the user can see the failure)
+    sqlite.prepare(`
+      DELETE FROM vec_document_chunks
+      WHERE chunk_id IN (
+        SELECT id FROM document_chunks WHERE document_id = ?
+      )
+    `).run(documentId);
+
+    await db.delete(documentChunks).where(eq(documentChunks.documentId, documentId));
+
+    await updateDocumentStatus(documentId, 'failed', { errorMessage: message });
+    logger.error('Ingestion failed', {
+      documentId,
+      error: message,
+      durationMs: Date.now() - startMs,
+    });
+  }
 }

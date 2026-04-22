@@ -22,7 +22,7 @@ import type { ChatRequest, ChatMessage } from './types';
 // @param input - Validated chat request containing conversationId and message text
 // @returns - Vercel AI SDK stream result for SSE response to client
 export async function handleChatMessage(input: ChatRequest) {
-  const { conversationId, message } = input;
+  const { conversationId, message, ragContext } = input;
 
   // Load conversation from DB and verify it exists and is active
   // (Why: archived conversations should not accept new messages)
@@ -56,7 +56,10 @@ export async function handleChatMessage(input: ChatRequest) {
     logger.warn('Persona not found, using default', { personaId: conversation.personaId });
   }
 
-  const systemPrompt = persona?.systemPrompt ?? 'You are a helpful AI assistant.';
+  const basePrompt = persona?.systemPrompt ?? 'You are a helpful AI assistant.';
+  // Prepend RAG context to the system prompt when documents are available (FR-017)
+  // (Why: system prompt is not subject to context-window trimming, so it is the safest place)
+  const systemPrompt = ragContext ? `${ragContext}\n\n${basePrompt}` : basePrompt;
 
   // Load provider config to determine which LLM to call
   // (Why: provider config maps to the specific AI SDK instance and model)
