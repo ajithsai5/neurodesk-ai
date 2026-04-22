@@ -30,6 +30,9 @@ data/*.db
 data/*.db-wal
 data/*.db-shm
 
+# uploaded documents (user files, not committed)
+data/documents/
+
 # playwright
 /test-results/
 /playwright-report/

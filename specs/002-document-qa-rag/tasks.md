@@ -16,8 +16,8 @@
 
 **Purpose**: Install new dependencies and prepare filesystem
 
-- [ ] T001 Install new npm dependencies: `npm install sqlite-vec pdf-parse` and `npm install --save-dev @types/pdf-parse`
-- [ ] T002 Create `data/documents/` directory and verify `data/` is in `.gitignore`
+- [x] T001 Install new npm dependencies: `npm install sqlite-vec pdf-parse` and `npm install --save-dev @types/pdf-parse`
+- [x] T002 Create `data/documents/` directory and verify `data/` is in `.gitignore`
 
 **Checkpoint**: Dependencies installed, file storage directory ready
 
@@ -29,14 +29,14 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T003 Extend `src/modules/shared/db/schema.ts` — add `documents` table (id, original_name, stored_name, file_path, mime_type, file_size, page_count, status enum, content_hash UNIQUE, error_message, created_at) and `document_chunks` table (id, document_id FK cascade, page_number, chunk_index, content, token_count, created_at) per `data-model.md`
-- [ ] T004 Extend `src/modules/shared/db/index.ts` — import `sqlite-vec`, call `sqliteVec.load(sqlite)` after pragma setup, then `sqlite.exec(CREATE VIRTUAL TABLE IF NOT EXISTS vec_document_chunks USING vec0(chunk_id INTEGER PRIMARY KEY, embedding FLOAT[768]))` before the Drizzle instance is created
-- [ ] T005 Run `npx drizzle-kit push` to apply new tables to `data/neurodesk.db`; verify tables exist with `sqlite3 data/neurodesk.db ".tables"`
-- [ ] T006 [P] Implement `src/modules/rag/pdf-extractor.ts` — wrap `pdf-parse`, export `extractPages(buffer: Buffer): Promise<{ pageNumber: number; text: string }[]>`; return empty array for zero-text PDFs; throw on corrupt files
-- [ ] T007 [P] Implement chunker in `src/modules/rag/ingestion-pipeline.ts` (chunk logic only, no DB calls yet) — export `chunkText(pages: { pageNumber: number; text: string }[]): { content: string; pageNumber: number; chunkIndex: number; tokenCount: number }[]` using `js-tiktoken` cl100k_base encoder, 512-token chunks, 64-token overlap sliding window
-- [ ] T008 [P] Implement `src/modules/rag/embedding-client.ts` — export `generateEmbedding(text: string): Promise<number[]>` that POSTs to `http://localhost:11434/api/embed` with `{ model: 'nomic-embed-text', input: text }`; validates response is a 768-dim float array; throws `EmbeddingError` with message "Ollama unreachable at http://localhost:11434" when the request fails
-- [ ] T009 [P] Add `'ollama'` case to `getLLMModel()` in `src/modules/chat/llm-client.ts` — use `createOpenAI({ baseURL: 'http://localhost:11434/v1', apiKey: 'ollama' })(modelId)`
-- [ ] T010 [P] Add Ollama provider seed entry in `src/modules/shared/db/seed.ts` — insert provider_config with `providerName: 'ollama'`, `modelId: 'llama3.1:8b'`, `displayName: 'Ollama (llama3.1:8b)'`; run `npm run db:seed` to apply
+- [x] T003 Extend `src/modules/shared/db/schema.ts` — add `documents` table (id, original_name, stored_name, file_path, mime_type, file_size, page_count, status enum, content_hash UNIQUE, error_message, created_at) and `document_chunks` table (id, document_id FK cascade, page_number, chunk_index, content, token_count, created_at) per `data-model.md`
+- [x] T004 Extend `src/modules/shared/db/index.ts` — import `sqlite-vec`, call `sqliteVec.load(sqlite)` after pragma setup, then `sqlite.exec(CREATE VIRTUAL TABLE IF NOT EXISTS vec_document_chunks USING vec0(chunk_id INTEGER PRIMARY KEY, embedding FLOAT[768]))` before the Drizzle instance is created
+- [x] T005 Run `npx drizzle-kit push` to apply new tables to `data/neurodesk.db`; verify tables exist with `sqlite3 data/neurodesk.db ".tables"`
+- [x] T006 [P] Implement `src/modules/rag/pdf-extractor.ts` — wrap `pdf-parse`, export `extractPages(buffer: Buffer): Promise<{ pageNumber: number; text: string }[]>`; return empty array for zero-text PDFs; throw on corrupt files
+- [x] T007 [P] Implement chunker in `src/modules/rag/ingestion-pipeline.ts` (chunk logic only, no DB calls yet) — export `chunkText(pages: { pageNumber: number; text: string }[]): { content: string; pageNumber: number; chunkIndex: number; tokenCount: number }[]` using `js-tiktoken` cl100k_base encoder, 512-token chunks, 64-token overlap sliding window
+- [x] T008 [P] Implement `src/modules/rag/embedding-client.ts` — export `generateEmbedding(text: string): Promise<number[]>` that POSTs to `http://localhost:11434/api/embed` with `{ model: 'nomic-embed-text', input: text }`; validates response is a 768-dim float array; throws `EmbeddingError` with message "Ollama unreachable at http://localhost:11434" when the request fails
+- [x] T009 [P] Add `'ollama'` case to `getLLMModel()` in `src/modules/chat/llm-client.ts` — use `createOpenAI({ baseURL: 'http://localhost:11434/v1', apiKey: 'ollama' })(modelId)`
+- [x] T010 [P] Add Ollama provider seed entry in `src/modules/shared/db/seed.ts` — insert provider_config with `providerName: 'ollama'`, `modelId: 'llama3.1:8b'`, `displayName: 'Ollama (llama3.1:8b)'`; run `npm run db:seed` to apply
 
 **Checkpoint**: DB schema migrated, sqlite-vec loaded, pdf-extractor + chunker + embedding-client scaffolded, Ollama provider registered
 
