@@ -1,0 +1,101 @@
+// File: src/components/DocumentUpload.tsx
+/**
+ * DocumentUpload — File picker and upload trigger for the document library.
+ * Accepts .pdf and .txt files up to 50 MB, posts to POST /api/documents,
+ * and notifies the parent when upload is accepted so polling can begin.
+ * (Why: upload is a distinct interaction from the library list — separating them
+ * keeps each component's responsibility focused)
+ */
+
+'use client';
+
+import { useRef, useState } from 'react';
+
+interface Props {
+  /** Called when the server accepts the upload (202). Parent should refresh library. */
+  onUploaded: () => void;
+}
+
+const MAX_SIZE_BYTES = 52_428_800; // 50 MB — mirrors server-side limit
+
+// DocumentUpload renders a styled file picker button and upload feedback
+export function DocumentUpload({ onUploaded }: Props) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFile(file: File) {
+    setError(null);
+
+    // Client-side size check (server validates again — this just improves UX)
+    if (file.size > MAX_SIZE_BYTES) {
+      setError('File exceeds 50 MB limit.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+
+      const res = await fetch('/api/documents', { method: 'POST', body: form });
+
+      if (res.status === 202) {
+        onUploaded();
+      } else if (res.status === 409) {
+        // Duplicate file — server already has it
+        const data = await res.json();
+        setError(`Already in library (ID ${data.existingId as number}).`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError((data as { error?: string }).error ?? 'Upload failed.');
+      }
+    } catch {
+      setError('Network error. Check your connection.');
+    } finally {
+      setUploading(false);
+      // Reset the input so the same file can be re-selected after an error
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) void handleFile(file);
+  }
+
+  return (
+    <div className="px-3 pb-2">
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".pdf,.txt"
+        className="hidden"
+        onChange={handleChange}
+        disabled={uploading}
+      />
+      <button
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm
+                   bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400
+                   text-white rounded-lg transition-colors"
+      >
+        {uploading ? (
+          <>
+            <span className="animate-spin">⟳</span>
+            Uploading…
+          </>
+        ) : (
+          <>
+            <span>+</span>
+            Upload Document
+          </>
+        )}
+      </button>
+      {error && (
+        <p className="mt-1 text-xs text-red-600 text-center">{error}</p>
+      )}
+    </div>
+  );
+}

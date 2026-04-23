@@ -9,9 +9,11 @@
 // Incoming chat request from the API route
 // @field conversationId - UUID of the target conversation
 // @field message - The user's message content (already validated by Zod)
+// @field ragContext - Optional pre-formatted document context block injected by the RAG pipeline
 export interface ChatRequest {
   conversationId: string;
   message: string;
+  ragContext?: string;
 }
 
 // Parameters for streaming a response from an LLM provider

@@ -2,7 +2,8 @@
 /**
  * Database Schema Definitions
  * Defines all SQLite tables using Drizzle ORM for the NeuroDesk AI application.
- * Four tables: conversations, messages, personas, provider_configs.
+ * Six tables: conversations, messages, personas, provider_configs, documents, document_chunks.
+ * The vec_document_chunks virtual table (sqlite-vec) is created separately in db/index.ts.
  * (Why: Drizzle provides type-safe schema definitions that map directly to TypeScript types)
  */
 
@@ -73,7 +74,7 @@ export const personas = sqliteTable('personas', {
 // (Why: allows runtime model switching without code changes or redeployment)
 export const providerConfigs = sqliteTable('provider_configs', {
   id: text('id').primaryKey(),
-  // providerName maps to SDK instances in llm-client.ts (e.g., 'openai', 'anthropic')
+  // providerName maps to SDK instances in llm-client.ts (e.g., 'openai', 'anthropic', 'ollama')
   providerName: text('provider_name').notNull(),
   modelId: text('model_id').notNull(),
   displayName: text('display_name').notNull(),
@@ -84,4 +85,54 @@ export const providerConfigs = sqliteTable('provider_configs', {
   // Unique constraint prevents duplicate provider+model combinations
   uniqueIndex('idx_provider_model').on(table.providerName, table.modelId),
   index('idx_provider_sort').on(table.sortOrder),
+]);
+
+// ============================================
+// RAG Tables — Document Library
+// Stores uploaded documents and their text chunks for retrieval-augmented generation.
+// The vector embeddings live in the sqlite-vec virtual table (vec_document_chunks)
+// created in db/index.ts — Drizzle does not manage virtual tables.
+// ============================================
+
+// Documents table — user-global document library accessible from all conversations
+// (Why: documents persist across sessions and are available to any conversation)
+export const documents = sqliteTable('documents', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  // originalName is the filename shown in the UI (never used for filesystem paths)
+  originalName: text('original_name').notNull(),
+  // storedName is the UUID-based filename used on disk (prevents path traversal)
+  storedName: text('stored_name').notNull(),
+  filePath: text('file_path').notNull(),
+  mimeType: text('mime_type').notNull(),
+  fileSize: integer('file_size').notNull(),
+  // pageCount is null while pending; populated after text extraction completes
+  pageCount: integer('page_count'),
+  // status drives the processing lifecycle: pending → ready | failed
+  status: text('status', { enum: ['pending', 'ready', 'failed'] }).notNull().default('pending'),
+  // contentHash (SHA-256) is the deduplication key — UNIQUE enforced at DB level
+  contentHash: text('content_hash').notNull().unique(),
+  // errorMessage is populated when status = 'failed'; null otherwise
+  errorMessage: text('error_message'),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+}, (table) => [
+  index('idx_doc_status').on(table.status),
+  index('idx_doc_created').on(table.createdAt),
+]);
+
+// Document chunks table — text segments extracted and split from each document
+// (Why: chunks are the unit of retrieval; each chunk maps to a vec_document_chunks embedding)
+export const documentChunks = sqliteTable('document_chunks', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  // Cascade delete: removing a document removes all its chunks automatically
+  documentId: integer('document_id').notNull()
+    .references(() => documents.id, { onDelete: 'cascade' }),
+  pageNumber: integer('page_number').notNull(),
+  chunkIndex: integer('chunk_index').notNull(),
+  content: text('content').notNull(),
+  tokenCount: integer('token_count').notNull(),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+}, (table) => [
+  index('idx_chunk_doc').on(table.documentId),
+  // Composite index used when loading chunks in order for a document
+  index('idx_chunk_doc_order').on(table.documentId, table.chunkIndex),
 ]);

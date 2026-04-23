@@ -85,8 +85,16 @@ async function seed() {
         isAvailable: true,
         sortOrder: 1,
       },
+      {
+        id: uuidv4(),
+        providerName: 'ollama',
+        modelId: 'llama3.1:8b',
+        displayName: 'Llama 3.1 8B (Ollama)',
+        isAvailable: true,
+        sortOrder: 2,
+      },
     ]);
-    console.log('Seeded 2 provider configs');
+    console.log('Seeded 3 provider configs');
   }
 
   // Close the connection after seeding
