@@ -1,4 +1,4 @@
-# CLAUDE.md
+﻿# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -67,11 +67,25 @@ Hybrid approach in `src/modules/chat/context-window.ts`: first trim to N message
 
 Path alias `@/*` resolves to `./src/*` in both app and tests (configured in `vitest.config.ts`).
 
+## Environment
+
+- **OS**: Windows 11 — shell is Git Bash (bash on Windows). Use bash syntax for all commands; do NOT use PowerShell cmdlets (`Get-ChildItem`, `Set-Location`, etc.) unless explicitly asked.
+- **Path separators**: Use forward slashes (`/`) in all shell commands. Double-quote paths that contain spaces.
+- **Line endings**: Repository uses LF (`\n`). Git is configured with `core.autocrlf=true`; CRLF warnings on checkout are expected and harmless.
+
+## Session Handoff
+
+At the end of every session (on user request or approaching token limit), update
+`memory/f015_session_handoff.md` (or the relevant handoff file for the active feature)
+with: what was completed this session, what files were changed, and the exact next task
+to start with in the next session. Keep it under 60 lines so it loads fast.
+
 ## General Behavior
 
 - When the user says to ONLY do X (e.g., "only add to .gitignore"), do exactly that and nothing more. Do not perform additional operations like committing, pushing, or modifying other files unless explicitly asked.
 - When the user references a file or asks "what do you think", always read the referenced files FIRST before responding. Do not ask the user to clarify what they want you to look at if files are clearly referenced in context.
 - When given a scoped instruction, confirm what you will do before doing it if the scope is ambiguous.
+- **Clarification echo-back**: After the user answers a clarification question, always confirm what you heard before acting. Format: "Got it — [restate the decision in one sentence]. Proceeding." This prevents acting on misheard answers.
 
 ## Git Operations
 

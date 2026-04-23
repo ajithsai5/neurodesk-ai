@@ -35,3 +35,6 @@ data/*.db-shm
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# coverage reports
+/coverage/
