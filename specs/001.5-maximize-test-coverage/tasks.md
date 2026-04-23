@@ -21,8 +21,8 @@ test task contributes to a measurable, enforced target. Dependencies are already
 installed — start from T002.
 
 - [x] T001 Install `@vitest/coverage-v8 ^4.1.5`, `@testing-library/react ^16.3.2`, `@testing-library/user-event ^14.6.1` as dev dependencies (`npm install -D ...`) — **DONE**
-- [ ] T002 Update `vitest.config.ts` — add `coverage` block (provider: `v8`, reporters: `["text","html","json-summary"]`, `reportsDirectory: "coverage"`, thresholds: `{statements:80,branches:90,functions:85,lines:80}`); change `include` to `['__tests__/**/*.test.{ts,tsx}']`
-- [ ] T003 [P] Add `coverage/` to `.gitignore`
+- [x] T002 Update `vitest.config.ts` — add `coverage` block (provider: `v8`, reporters: `["text","html","json-summary"]`, `reportsDirectory: "coverage"`, thresholds: `{statements:80,branches:90,functions:85,lines:80}`); change `include` to `['__tests__/**/*.test.{ts,tsx}']`
+- [x] T003 [P] Add `coverage/` to `.gitignore`
 
 **Checkpoint**: `npm test -- --coverage` produces a `coverage/` directory and exits non-zero when any threshold is breached.
 
@@ -35,8 +35,8 @@ installed — start from T002.
 
 **⚠️ CRITICAL**: Phase 3 (health test) and Phase 6 (logger tests) cannot pass until this phase is complete.
 
-- [ ] T004 Create `src/app/api/health/route.ts` — `export function GET() { return Response.json({ status: 'ok' }); }` (no DB call, no auth)
-- [ ] T005 [P] Fix `src/modules/shared/logger.ts` — add `if (process.env.NODE_ENV === 'test') return;` as first line of `log()`; change `default:` case from `console.log` to `console.info` so `vi.spyOn(console, 'info')` resolves correctly in tests
+- [x] T004 Create `src/app/api/health/route.ts` — `export function GET() { return Response.json({ status: 'ok' }); }` (no DB call, no auth)
+- [x] T005 [P] Fix `src/modules/shared/logger.ts` — add `if (process.env.NODE_ENV === 'test') return;` as first line of `log()`; change `default:` case from `console.log` to `console.info` so `vi.spyOn(console, 'info')` resolves correctly in tests
 
 **Checkpoint**: `npx vitest run __tests__/integration/health-api.test.ts` passes (after T007 is written); logger spy tests pass without console noise.
 
@@ -63,35 +63,35 @@ vi.mock('@/modules/shared/db', () => {
 
 ### POST /api/chat tests (`__tests__/integration/chat-api.test.ts`)
 
-- [ ] T006 [US1] Replace `it.todo('should return a streaming response for valid input')` — mock `@/modules/chat` (`handleChatMessage` returns `{ toDataStreamResponse: vi.fn(() => new Response('ok')) }`), POST `{ conversationId: 'c-1', message: 'Hi' }`, assert status 200 in `__tests__/integration/chat-api.test.ts`
-- [ ] T007 [P] [US1] Replace `it.todo('should return 400 for missing conversationId')` — POST `{ message: 'Hi' }` (no conversationId), assert 400 + `{ error: 'Invalid input' }` in `__tests__/integration/chat-api.test.ts`
-- [ ] T008 [P] [US1] Replace `it.todo('should return 400 for empty message')` — POST `{ conversationId: 'c-1', message: '' }`, assert 400 in `__tests__/integration/chat-api.test.ts`
-- [ ] T009 [P] [US1] Replace `it.todo('should return 400 for message exceeding 10,000 characters')` — POST with `message: 'x'.repeat(10001)`, assert 400 in `__tests__/integration/chat-api.test.ts`
-- [ ] T010 [P] [US1] Replace `it.todo('should return 404 for nonexistent conversation')` — mock `handleChatMessage` to throw `new Error('Conversation not found')`, assert 404 in `__tests__/integration/chat-api.test.ts`
-- [ ] T011 [P] [US1] Add new test: LLM provider error — mock `handleChatMessage` to throw `new Error('AI service unavailable: openai')`, assert 500 + `{ error: 'AI service unavailable' }` in `__tests__/integration/chat-api.test.ts`
-- [ ] T012 [P] [US1] Replace `it.todo('should save user message to database')` and `it.todo('should save assistant message after stream completes')` — verify `handleChatMessage` was called with correct args in `__tests__/integration/chat-api.test.ts`
+- [x] T006 [US1] Replace `it.todo('should return a streaming response for valid input')` — mock `@/modules/chat` (`handleChatMessage` returns `{ toDataStreamResponse: vi.fn(() => new Response('ok')) }`), POST `{ conversationId: 'c-1', message: 'Hi' }`, assert status 200 in `__tests__/integration/chat-api.test.ts`
+- [x] T007 [P] [US1] Replace `it.todo('should return 400 for missing conversationId')` — POST `{ message: 'Hi' }` (no conversationId), assert 400 + `{ error: 'Invalid input' }` in `__tests__/integration/chat-api.test.ts`
+- [x] T008 [P] [US1] Replace `it.todo('should return 400 for empty message')` — POST `{ conversationId: 'c-1', message: '' }`, assert 400 in `__tests__/integration/chat-api.test.ts`
+- [x] T009 [P] [US1] Replace `it.todo('should return 400 for message exceeding 10,000 characters')` — POST with `message: 'x'.repeat(10001)`, assert 400 in `__tests__/integration/chat-api.test.ts`
+- [x] T010 [P] [US1] Replace `it.todo('should return 404 for nonexistent conversation')` — mock `handleChatMessage` to throw `new Error('Conversation not found')`, assert 404 in `__tests__/integration/chat-api.test.ts`
+- [x] T011 [P] [US1] Add new test: LLM provider error — mock `handleChatMessage` to throw `new Error('AI service unavailable: openai')`, assert 500 + `{ error: 'AI service unavailable' }` in `__tests__/integration/chat-api.test.ts`
+- [x] T012 [P] [US1] Replace `it.todo('should save user message to database')` and `it.todo('should save assistant message after stream completes')` — verify `handleChatMessage` was called with correct args in `__tests__/integration/chat-api.test.ts`
 
 ### GET /api/health test (new file)
 
-- [ ] T013 [P] [US1] Create `__tests__/integration/health-api.test.ts` — import `GET` from `@/app/api/health/route`, assert status 200 and body `{ status: 'ok' }`; no mocks required
+- [x] T013 [P] [US1] Create `__tests__/integration/health-api.test.ts` — import `GET` from `@/app/api/health/route`, assert status 200 and body `{ status: 'ok' }`; no mocks required
 
 ### GET|POST /api/conversations tests (`__tests__/integration/conversations-api.test.ts`)
 
-- [ ] T014 [US1] Replace `it.todo('should return empty list when no conversations exist')` — mock `db.all` returns `[]`, GET `/api/conversations`, assert `{ conversations: [] }` in `__tests__/integration/conversations-api.test.ts`
-- [ ] T015 [P] [US1] Replace `it.todo('should return active conversations sorted by updatedAt DESC')` — mock `db.all` returns `[fakeConv]`, assert array in response in `__tests__/integration/conversations-api.test.ts`
-- [ ] T016 [P] [US1] Replace `it.todo('should filter by archived status')` — GET `?status=archived`, assert `db.where` was called (status filter applied) in `__tests__/integration/conversations-api.test.ts`
-- [ ] T017 [P] [US1] Replace `it.todo('should create a new conversation with defaults')` — mock `db.get` returns persona/provider, mock `db.run`, POST `{}`, assert 201 + conversation object in `__tests__/integration/conversations-api.test.ts`
-- [ ] T018 [P] [US1] Replace `it.todo('should create a conversation with specified persona and provider')` — POST `{ personaId: 'p-1', providerId: 'pr-1' }`, assert 201 in `__tests__/integration/conversations-api.test.ts`
+- [x] T014 [US1] Replace `it.todo('should return empty list when no conversations exist')` — mock `db.all` returns `[]`, GET `/api/conversations`, assert `{ conversations: [] }` in `__tests__/integration/conversations-api.test.ts`
+- [x] T015 [P] [US1] Replace `it.todo('should return active conversations sorted by updatedAt DESC')` — mock `db.all` returns `[fakeConv]`, assert array in response in `__tests__/integration/conversations-api.test.ts`
+- [x] T016 [P] [US1] Replace `it.todo('should filter by archived status')` — GET `?status=archived`, assert `db.where` was called (status filter applied) in `__tests__/integration/conversations-api.test.ts`
+- [x] T017 [P] [US1] Replace `it.todo('should create a new conversation with defaults')` — mock `db.get` returns persona/provider, mock `db.run`, POST `{}`, assert 201 + conversation object in `__tests__/integration/conversations-api.test.ts`
+- [x] T018 [P] [US1] Replace `it.todo('should create a conversation with specified persona and provider')` — POST `{ personaId: 'p-1', providerId: 'pr-1' }`, assert 201 in `__tests__/integration/conversations-api.test.ts`
 
 ### GET|PATCH|DELETE /api/conversations/:id tests (`__tests__/integration/conversations-api.test.ts`)
 
-- [ ] T019 [P] [US1] Replace `it.todo('should return conversation with messages')` — import `GET` from `conversations/[id]/route`, mock `db.get` returns conversation + `db.all` returns messages, assert 200 + `{ conversation, messages }` in `__tests__/integration/conversations-api.test.ts`
-- [ ] T020 [P] [US1] Replace `it.todo('should return 404 for nonexistent conversation')` (GET) — mock `db.get` returns undefined, assert 404 in `__tests__/integration/conversations-api.test.ts`
-- [ ] T021 [P] [US1] Replace `it.todo('should rename a conversation')` — PATCH `{ title: 'New Title' }`, mock `db.run`, assert 200 in `__tests__/integration/conversations-api.test.ts`
-- [ ] T022 [P] [US1] Replace `it.todo('should reject empty title')` — PATCH `{ title: '' }`, assert 400 in `__tests__/integration/conversations-api.test.ts`
-- [ ] T023 [P] [US1] Replace `it.todo('should reject title exceeding 200 characters')` — PATCH `{ title: 'x'.repeat(201) }`, assert 400 in `__tests__/integration/conversations-api.test.ts`
-- [ ] T024 [P] [US1] Replace `it.todo('should delete conversation and cascade to messages')` — DELETE, mock `db.run`, assert 200 in `__tests__/integration/conversations-api.test.ts`
-- [ ] T025 [P] [US1] Replace `it.todo('should return 404 for nonexistent conversation')` (DELETE) — mock `db.get` returns undefined, assert 404 in `__tests__/integration/conversations-api.test.ts`
+- [x] T019 [P] [US1] Replace `it.todo('should return conversation with messages')` — import `GET` from `conversations/[id]/route`, mock `db.get` returns conversation + `db.all` returns messages, assert 200 + `{ conversation, messages }` in `__tests__/integration/conversations-api.test.ts`
+- [x] T020 [P] [US1] Replace `it.todo('should return 404 for nonexistent conversation')` (GET) — mock `db.get` returns undefined, assert 404 in `__tests__/integration/conversations-api.test.ts`
+- [x] T021 [P] [US1] Replace `it.todo('should rename a conversation')` — PATCH `{ title: 'New Title' }`, mock `db.run`, assert 200 in `__tests__/integration/conversations-api.test.ts`
+- [x] T022 [P] [US1] Replace `it.todo('should reject empty title')` — PATCH `{ title: '' }`, assert 400 in `__tests__/integration/conversations-api.test.ts`
+- [x] T023 [P] [US1] Replace `it.todo('should reject title exceeding 200 characters')` — PATCH `{ title: 'x'.repeat(201) }`, assert 400 in `__tests__/integration/conversations-api.test.ts`
+- [x] T024 [P] [US1] Replace `it.todo('should delete conversation and cascade to messages')` — DELETE, mock `db.run`, assert 200 in `__tests__/integration/conversations-api.test.ts`
+- [x] T025 [P] [US1] Replace `it.todo('should return 404 for nonexistent conversation')` (DELETE) — mock `db.get` returns undefined, assert 404 in `__tests__/integration/conversations-api.test.ts`
 
 **Checkpoint**: `npx vitest run __tests__/integration/` — all tests pass; API statement coverage ≥ 80%.
 
@@ -122,10 +122,10 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
 ```
 
-- [ ] T026 [P] [US2] Create `__tests__/components/ChatPanel.test.tsx` — render `<ChatPanel conversationId={null} />`; assert welcome screen renders without crash; render with `conversationId="c-1"`, assert no throw; mock `useChat` returns `messages: [{ role:'user', content:'Hi', id:'1' }]`, assert message appears
-- [ ] T027 [P] [US2] Create `__tests__/components/MessageInput.test.tsx` — render `<MessageInput onSubmit={spy} isLoading={false} />`; use `userEvent.type` + `userEvent.keyboard('{Enter}')`, assert `onSubmit` called with trimmed text and input cleared; assert empty input does NOT call `onSubmit`; assert `isLoading=true` disables textarea
-- [ ] T028 [P] [US2] Create `__tests__/components/PersonaSelector.test.tsx` — mock fetch returns `{ personas: [{ id:'p1', name:'Tutor', description:'...' }] }`; render `<PersonaSelector selectedPersonaId={null} onSelect={spy} />`; click trigger button; assert persona appears; click persona button; assert `onSelect` called with `'p1'`
-- [ ] T029 [P] [US2] Create `__tests__/components/ModelSwitcher.test.tsx` — mock fetch returns `{ providers: [{ id:'pr1', providerName:'openai', displayName:'GPT-4o', isAvailable:true }] }`; render `<ModelSwitcher selectedProviderId={null} onSelect={spy} />`; click trigger; assert provider appears; click provider; assert `onSelect` called with `'pr1'`
+- [x] T026 [P] [US2] Create `__tests__/components/ChatPanel.test.tsx` — render `<ChatPanel conversationId={null} />`; assert welcome screen renders without crash; render with `conversationId="c-1"`, assert no throw; mock `useChat` returns `messages: [{ role:'user', content:'Hi', id:'1' }]`, assert message appears
+- [x] T027 [P] [US2] Create `__tests__/components/MessageInput.test.tsx` — render `<MessageInput onSubmit={spy} isLoading={false} />`; use `userEvent.type` + `userEvent.keyboard('{Enter}')`, assert `onSubmit` called with trimmed text and input cleared; assert empty input does NOT call `onSubmit`; assert `isLoading=true` disables textarea
+- [x] T028 [P] [US2] Create `__tests__/components/PersonaSelector.test.tsx` — mock fetch returns `{ personas: [{ id:'p1', name:'Tutor', description:'...' }] }`; render `<PersonaSelector selectedPersonaId={null} onSelect={spy} />`; click trigger button; assert persona appears; click persona button; assert `onSelect` called with `'p1'`
+- [x] T029 [P] [US2] Create `__tests__/components/ModelSwitcher.test.tsx` — mock fetch returns `{ providers: [{ id:'pr1', providerName:'openai', displayName:'GPT-4o', isAvailable:true }] }`; render `<ModelSwitcher selectedProviderId={null} onSelect={spy} />`; click trigger; assert provider appears; click provider; assert `onSelect` called with `'pr1'`
 
 **Checkpoint**: `npx vitest run __tests__/components/` — all 4 test files pass; component function coverage ≥ 75%.
 
@@ -137,9 +137,9 @@ afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
 **Independent Test**: `npx vitest run __tests__/modules/chat/chat-service.test.ts`
 
-- [ ] T030 [US3] Add `describe('buildContextWindow')` block to `__tests__/modules/chat/chat-service.test.ts` — test trim-by-count: build 25 fake messages, call `handleChatMessage` with mocked db returning all 25, assert `streamChatResponse` was called with only the last 20 messages in its `messages` arg
-- [ ] T031 [P] [US3] Add test: trim-by-token-cap — mock `js-tiktoken` (or spy on token count) to simulate 25 messages summing > 100K tokens; assert oldest messages are dropped until under cap before LLM call in `__tests__/modules/chat/chat-service.test.ts`
-- [ ] T032 [P] [US3] Add test: full `handleChatMessage` success path — mock `db.get` returning conversation with `personaId`/`providerId`, mock persona lookup returning `systemPrompt: 'You are...'`, mock `streamChatResponse`, mock `db.run`; assert `streamChatResponse` called with correct `systemPrompt` and that `db.run` (save assistant message) was called after stream resolves in `__tests__/modules/chat/chat-service.test.ts`
+- [x] T030 [US3] Add `describe('buildContextWindow')` block to `__tests__/modules/chat/chat-service.test.ts` — test trim-by-count: build 25 fake messages, call `handleChatMessage` with mocked db returning all 25, assert `streamChatResponse` was called with only the last 20 messages in its `messages` arg
+- [x] T031 [P] [US3] Add test: trim-by-token-cap — mock `js-tiktoken` (or spy on token count) to simulate 25 messages summing > 100K tokens; assert oldest messages are dropped until under cap before LLM call in `__tests__/modules/chat/chat-service.test.ts`
+- [x] T032 [P] [US3] Add test: full `handleChatMessage` success path — mock `db.get` returning conversation with `personaId`/`providerId`, mock persona lookup returning `systemPrompt: 'You are...'`, mock `streamChatResponse`, mock `db.run`; assert `streamChatResponse` called with correct `systemPrompt` and that `db.run` (save assistant message) was called after stream resolves in `__tests__/modules/chat/chat-service.test.ts`
 
 **Checkpoint**: `npx vitest run __tests__/modules/chat/chat-service.test.ts` — new tests pass; statement coverage ≥ 75%.
 
@@ -152,10 +152,10 @@ Requires T005 (logger fix) to be complete first.
 
 **Independent Test**: `npx vitest run __tests__/modules/shared/logger.test.ts`
 
-- [ ] T033 [US4] Create `__tests__/modules/shared/logger.test.ts` — `vi.spyOn(console, 'info')`; call `logger.info('msg')`; assert spy NOT called (silent in `NODE_ENV=test`); restore spy in `afterEach`
-- [ ] T034 [P] [US4] Add test in `logger.test.ts`: temporarily set `process.env.NODE_ENV = 'development'`, spy on `console.warn`, call `logger.warn('msg')`, assert spy called with stringified JSON containing `level:'warn'` and `message:'msg'`; restore `NODE_ENV` in afterEach
-- [ ] T035 [P] [US4] Add test in `logger.test.ts`: `logger.error` with `Error` object — `vi.spyOn(console, 'error')`; set `NODE_ENV='development'`; call `logger.error('oops', { error: new Error('boom').message })`; assert spy called and output contains `'oops'`
-- [ ] T036 [P] [US4] Add test in `logger.test.ts`: `logger.debug` is suppressed in non-development — set `NODE_ENV='production'`, spy `console.debug`, call `logger.debug('x')`, assert NOT called
+- [x] T033 [US4] Create `__tests__/modules/shared/logger.test.ts` — `vi.spyOn(console, 'info')`; call `logger.info('msg')`; assert spy NOT called (silent in `NODE_ENV=test`); restore spy in `afterEach`
+- [x] T034 [P] [US4] Add test in `logger.test.ts`: temporarily set `process.env.NODE_ENV = 'development'`, spy on `console.warn`, call `logger.warn('msg')`, assert spy called with stringified JSON containing `level:'warn'` and `message:'msg'`; restore `NODE_ENV` in afterEach
+- [x] T035 [P] [US4] Add test in `logger.test.ts`: `logger.error` with `Error` object — `vi.spyOn(console, 'error')`; set `NODE_ENV='development'`; call `logger.error('oops', { error: new Error('boom').message })`; assert spy called and output contains `'oops'`
+- [x] T036 [P] [US4] Add test in `logger.test.ts`: `logger.debug` is suppressed in non-development — set `NODE_ENV='production'`, spy `console.debug`, call `logger.debug('x')`, assert NOT called
 
 **Checkpoint**: `npx vitest run __tests__/modules/shared/logger.test.ts` — all 4 tests pass; `logger.ts` statement coverage ≥ 80%.
 
@@ -165,9 +165,9 @@ Requires T005 (logger fix) to be complete first.
 
 **Goal**: Make coverage visible and enforced in CI; document the workflow in README.
 
-- [ ] T037 [US5] Update `README.md` — add `## Testing` section: `npm test` (all tests), `npm test -- --coverage` (coverage report), coverage thresholds table, link to `coverage/index.html`
-- [ ] T038 [P] [US5] Add shields.io static badge to `README.md` header: `![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen)` (update percentage when actual run confirms threshold met)
-- [ ] T039 [US5] Create `.github/workflows/ci.yml` — `on: push/PR to master`; single job `ubuntu-latest`; steps: `actions/checkout@v4`, `actions/setup-node@v4` (node 20, cache npm), `npm ci`, `npm run lint`, `npm test -- --coverage`
+- [x] T037 [US5] Update `README.md` — add `## Testing` section: `npm test` (all tests), `npm test -- --coverage` (coverage report), coverage thresholds table, link to `coverage/index.html`
+- [x] T038 [P] [US5] Add shields.io static badge to `README.md` header: `![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen)` (update percentage when actual run confirms threshold met)
+- [x] T039 [US5] Create `.github/workflows/ci.yml` — `on: push/PR to master`; single job `ubuntu-latest`; steps: `actions/checkout@v4`, `actions/setup-node@v4` (node 20, cache npm), `npm ci`, `npm run lint`, `npm test -- --coverage`
 
 **Checkpoint**: Push a commit; confirm GitHub Actions runs the workflow and passes. README shows badge.
 
