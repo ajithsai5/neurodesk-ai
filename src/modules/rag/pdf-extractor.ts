@@ -15,12 +15,13 @@ type PdfParseResult = { text: string; numpages: number };
 
 /**
  * Dynamically load pdf-parse, handling both CJS and ESM interop shapes.
- * Using dynamic import inside the function ensures correct module resolution
- * in both Next.js (Webpack) and Vitest (Vite/ESM) environments.
+ * Import from the lib path directly to avoid pdf-parse/index.js running its
+ * own test suite on load (it checks !module.parent, which is true under ESM
+ * dynamic import, causing it to try reading a non-existent test PDF file).
  */
 async function loadPdfParse(): Promise<(buffer: Buffer) => Promise<PdfParseResult>> {
-  const mod = await import('pdf-parse');
-  // pdf-parse may land as the default export or as the module itself
+  const mod = await import('pdf-parse/lib/pdf-parse.js');
+  // CJS module loaded via ESM: the function is at mod.default
   const fn = (mod as unknown as { default: unknown }).default ?? mod;
   if (typeof fn !== 'function') {
     throw new Error('pdf-parse module did not export a callable function');

@@ -22,7 +22,17 @@ export async function POST(req: NextRequest) {
     // Parse and validate the request body against the chat input schema
     // (Why: validates at the system boundary before any business logic runs)
     const body = await req.json();
-    const parsed = chatInputSchema.safeParse(body);
+
+    // The Vercel AI SDK useChat hook sends `messages` (array) rather than a single
+    // `message` string. Extract the last user message content so both the browser SDK
+    // and direct API calls (curl / tests) are handled by the same schema.
+    const messageText: unknown =
+      body.message ??
+      (Array.isArray(body.messages)
+        ? body.messages[body.messages.length - 1]?.content
+        : undefined);
+
+    const parsed = chatInputSchema.safeParse({ conversationId: body.conversationId, message: messageText });
 
     if (!parsed.success) {
       return Response.json(

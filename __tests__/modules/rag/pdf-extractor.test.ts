@@ -1,14 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
 import { extractPages } from '@/modules/rag/pdf-extractor';
 
-// Mock pdf-parse so tests don't depend on the CJS/ESM interop resolution
-vi.mock('pdf-parse', () => ({
+// Mock the lib path directly — pdf-parse/index.js runs its test suite on import
+// (it uses !module.parent which is true under ESM dynamic import), so we import
+// from the lib path to skip that. The mock must match the import path used in production.
+vi.mock('pdf-parse/lib/pdf-parse.js', () => ({
   default: vi.fn(),
 }));
 
 // Helper to set up a mock pdf-parse result for a given page structure
 async function mockPdfParse(pages: string[]) {
-  const mod = await import('pdf-parse');
+  const mod = await import('pdf-parse/lib/pdf-parse.js');
   const mockFn = (mod as unknown as { default: ReturnType<typeof vi.fn> }).default;
   mockFn.mockResolvedValue({
     text: pages.join('\f'),
@@ -52,7 +54,7 @@ describe('extractPages', () => {
   });
 
   it('throws an error when pdf-parse rejects (corrupt buffer)', async () => {
-    const mod = await import('pdf-parse');
+    const mod = await import('pdf-parse/lib/pdf-parse.js');
     const mockFn = (mod as unknown as { default: ReturnType<typeof vi.fn> }).default;
     mockFn.mockRejectedValueOnce(new Error('Invalid PDF structure'));
 
