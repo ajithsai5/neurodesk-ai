@@ -21,6 +21,10 @@ interface LogEntry {
 // @param message - Human-readable log message
 // @param meta - Optional key-value metadata merged into the log entry
 function log(level: LogLevel, message: string, meta?: Record<string, unknown>) {
+  // Suppress all log output during tests to keep test output clean
+  // (Why: noisy JSON log lines pollute test runner output and obscure test failures)
+  if (process.env.NODE_ENV === 'test') return;
+
   // Build structured log entry with timestamp and optional metadata
   const entry: LogEntry = {
     level,
@@ -50,7 +54,7 @@ function log(level: LogLevel, message: string, meta?: Record<string, unknown>) {
       }
       break;
     default:
-      console.log(output);
+      console.info(output);
   }
 }
 
