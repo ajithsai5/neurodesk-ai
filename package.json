@@ -24,7 +24,7 @@
     "ai": "^4.3.0",
     "better-sqlite3": "^11.8.0",
     "coverage-badge-creator": "^2.1.0",
-    "drizzle-orm": "^0.39.0",
+    "drizzle-orm": "^0.45.2",
     "js-tiktoken": "^1.0.18",
     "jsdom": "^29.0.2",
     "next": "^14.2.0",
