@@ -1,7 +1,7 @@
 # NeuroDesk AI
 
 ![](https://img.shields.io/badge/Coverage-91%25-83A603.svg?prefix=$coverage$)
-![CI](https://github.com/ajithsai/neurodesk-ai/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/ajithsai5/neurodesk-ai/actions/workflows/ci.yml/badge.svg)
 
 AI-powered desktop assistant — chat, RAG, and memory. Built with Next.js 14, TypeScript, and SQLite.
 
