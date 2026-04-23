@@ -69,10 +69,11 @@ Navigate to `http://localhost:3000`. The document library panel should appear al
 ## Verify the Pipeline End-to-End
 
 1. Open a conversation.
-2. Upload a small PDF (< 5 pages) using the document upload button.
-3. Wait for the status badge to change from **Pending** → **Ready** (typically 5–30 seconds for a small doc).
+2. Upload a small PDF or `.txt` file (< 5 pages / < 50 MB) using the document upload button in the sidebar.
+3. Wait for the status badge to change from **Pending** → **Ready** (typically 1–10 seconds when Ollama is warm).
 4. Ask: *"What is the main topic of this document?"*
-5. The response should include text grounded in the document with a `[DocumentName, Page N]` citation.
+5. The response should be grounded in the document and include a `[DocumentName, Page N]` citation.
+6. Click the **Sources** toggle below the assistant message to expand and verify the source excerpt.
 
 ---
 
@@ -83,7 +84,7 @@ With Ollama running:
 1. Open browser DevTools → Network tab.
 2. Upload a PDF and ask a question.
 3. Confirm zero requests to `api.openai.com` or `api.anthropic.com`.
-4. All traffic should go to `localhost:11434` (embeddings + generation).
+4. All traffic should go to `127.0.0.1:11434` (embeddings + generation).
 
 ---
 
@@ -91,7 +92,7 @@ With Ollama running:
 
 | Symptom | Likely Cause | Fix |
 |---------|-------------|-----|
-| "Embedding failed: Ollama unreachable" | Ollama not running | Run `ollama serve` |
+| "Ollama unreachable at http://127.0.0.1:11434" | Ollama not running | Run `ollama serve` |
 | Document stuck in `pending` | Embedding model not pulled | `ollama pull nomic-embed-text` |
 | `sqlite-vec` not found error | Extension not loading | Check `npm install sqlite-vec`; restart dev server |
 | Empty text extraction | Scanned PDF (image-only) | v1 does not support OCR; use a text-based PDF |

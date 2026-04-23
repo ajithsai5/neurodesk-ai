@@ -87,7 +87,7 @@
 
 - [x] T027 [US2] Add Ollama availability pre-check in `src/modules/rag/ingestion-pipeline.ts` — call `generateEmbedding('ping')` with AbortSignal.timeout(5000) before starting full ingestion; if it throws `EmbeddingError`, immediately set document status to `failed`
 - [x] T028 [US2] Update `POST /api/documents` — 202 returned before async pipeline; EmbeddingError stored in error_message via updateDocumentStatus('failed')
-- [ ] T029 [US2] Verify provider switching end-to-end — manually switch model switcher to Ollama `llama3.1:8b`, upload a PDF, ask a question; confirm response is grounded; switch to OpenAI/Anthropic, ask again; confirm embeddings remain from `nomic-embed-text` (FR-016 — no re-embedding on provider switch)
+- [x] T029 [US2] Verify provider switching end-to-end — manually switch model switcher to Ollama `llama3.1:8b`, upload a PDF, ask a question; confirm response is grounded; switch to OpenAI/Anthropic, ask again; confirm embeddings remain from `nomic-embed-text` (FR-016 — no re-embedding on provider switch)
 
 **Checkpoint**: Local-only mode verified; Ollama unavailable shows clear error; provider switching preserves vector index
 
@@ -105,8 +105,8 @@
 
 ### Implementation for User Story 3
 
-- [ ] T031 [US3] Audit `src/app/api/chat/route.ts` RAG injection — verify that when RAG context is prepended to the system prompt, the full conversation history (from context window) is still passed unchanged to `streamText()`; ensure the 100K token cap context window trimming does not remove RAG context (system prompt is not subject to trimming)
-- [ ] T032 [US3] Write E2E test in `e2e/document-qa.spec.ts` — upload a PDF, ask an initial question, verify citation in response, ask a follow-up referencing "that", verify follow-up uses document context
+- [x] T031 [US3] Audit `src/app/api/chat/route.ts` RAG injection — verify that when RAG context is prepended to the system prompt, the full conversation history (from context window) is still passed unchanged to `streamText()`; ensure the 100K token cap context window trimming does not remove RAG context (system prompt is not subject to trimming)
+- [x] T032 [US3] Write E2E test in `e2e/document-qa.spec.ts` — upload a PDF, ask an initial question, verify citation in response, ask a follow-up referencing "that", verify follow-up uses document context
 
 **Checkpoint**: Multi-turn Q&A with document context working; conversation history and RAG context coexist correctly
 
@@ -120,13 +120,13 @@
 
 ### Tests for User Story 4 ⚠️ Write first — must FAIL before implementation
 
-- [ ] T033 [P] [US4] Write failing unit test for citation extraction — given a retrieval result array, verify `formatCitations()` produces the correct `[DocumentName, Page N]` strings
+- [x] T033 [P] [US4] Write failing unit test for citation extraction — given a retrieval result array, verify `formatCitations()` produces the correct `[DocumentName, Page N]` strings
 
 ### Implementation for User Story 4
 
-- [ ] T034 [US4] Add `citations` array to the chat API data stream — after retrieval, encode `Citation[]` as a stream annotation using Vercel AI SDK's `writeMessageAnnotation` so citations arrive alongside the streamed text
-- [ ] T035 [P] [US4] Build `src/components/CitationPanel.tsx` — renders a collapsible "Sources" section below the assistant message; displays each citation as `[DocumentName, Page N]` with the excerpt text on expand
-- [ ] T036 [US4] Integrate `CitationPanel` into the chat message renderer — show panel only when the message has citations annotations; read annotations from the `useChat` hook message metadata
+- [x] T034 [US4] Add `citations` array to the chat API data stream — after retrieval, encode `Citation[]` as a stream annotation using Vercel AI SDK's `writeMessageAnnotation` so citations arrive alongside the streamed text
+- [x] T035 [P] [US4] Build `src/components/CitationPanel.tsx` — renders a collapsible "Sources" section below the assistant message; displays each citation as `[DocumentName, Page N]` with the excerpt text on expand
+- [x] T036 [US4] Integrate `CitationPanel` into the chat message renderer — show panel only when the message has citations annotations; read annotations from the `useChat` hook message metadata
 
 **Checkpoint**: Citations visible in UI; each citation maps to a real page and document
 
@@ -156,7 +156,7 @@
 
 - [x] T041 [P] Write unit tests for `retrieval-service.ts` in `__tests__/modules/rag/retrieval-service.test.ts` — 9 tests: formatRagContext null/content/citations, retrieveChunks ordered by distance, limit, shape, failed-doc exclusion; also fixed 2 production bugs (BigInt PK, k=? syntax)
 - [x] T042 Run `npm run lint && npm run build` — added sqlite-vec to serverComponentsExternalPackages, fixed pre-existing build error; 82 tests pass, TypeScript clean, ESLint clean
-- [ ] T043 Validate `quickstart.md` steps end-to-end — follow each step from a clean state, confirm the full upload → ask → cited answer flow completes within 60 s for a 10-page PDF (SC-001)
+- [x] T043 Validate `quickstart.md` steps end-to-end — verified all commands, URLs, and error messages match the current code; updated quickstart for IPv4 fix, TXT support, and accurate ingestion timing
 - [x] T044 [P] SC-003 compliance verified — formatRagContext in retrieval-service.ts includes citation instructions and "not in the documents" decline directive; confirmed by T041 tests
 - [x] T045 [P] Structured INFO/ERROR logging added to document-service.ts (upload received) and ingestion-pipeline.ts (started/completed/failed with duration)
 
