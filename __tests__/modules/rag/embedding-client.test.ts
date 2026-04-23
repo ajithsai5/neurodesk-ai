@@ -16,7 +16,7 @@ describe('generateEmbedding', () => {
 
     expect(fetchSpy).toHaveBeenCalledOnce();
     const [url, options] = fetchSpy.mock.calls[0]!;
-    expect(url).toBe('http://localhost:11434/api/embed');
+    expect(url).toBe('http://127.0.0.1:11434/api/embed');
     expect(options?.method).toBe('POST');
     const body = JSON.parse(options?.body as string);
     expect(body.model).toBe('nomic-embed-text');

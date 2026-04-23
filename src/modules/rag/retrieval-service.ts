@@ -69,6 +69,28 @@ export async function retrieveChunks(
 }
 
 /**
+ * A single citation referencing a source page in an uploaded document.
+ * Sent as a message annotation so the client can render a Sources panel.
+ */
+export interface Citation {
+  documentName: string;
+  pageNumber: number;
+  excerpt: string;
+}
+
+/**
+ * Convert retrieved chunks into Citation objects for the client-side Sources panel.
+ * Returns an empty array when no chunks are available.
+ */
+export function formatCitations(chunks: RetrievedChunk[]): Citation[] {
+  return chunks.map((chunk) => ({
+    documentName: chunk.documentName,
+    pageNumber: chunk.pageNumber,
+    excerpt: chunk.content,
+  }));
+}
+
+/**
  * Format retrieved chunks as a structured context block for LLM injection.
  * Returns null when no chunks are available (no documents in library).
  */

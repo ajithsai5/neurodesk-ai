@@ -7,9 +7,10 @@
  */
 
 import { NextRequest } from 'next/server';
+import { StreamData } from 'ai';
 import { chatInputSchema } from '@/modules/shared/validation';
 import { handleChatMessage } from '@/modules/chat';
-import { listDocuments, retrieveChunks, formatRagContext } from '@/modules/rag';
+import { listDocuments, retrieveChunks, formatRagContext, formatCitations } from '@/modules/rag';
 import { logger } from '@/modules/shared/logger';
 
 // Handle incoming chat messages and return a streaming AI response
@@ -30,14 +31,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Build RAG context if any ready documents exist (FR-017: skip gracefully when none)
+    // Build RAG context and collect citations if any ready documents exist (FR-017: skip gracefully when none)
     let ragContext: string | undefined;
+    let streamData: StreamData | undefined;
     try {
       const docs = await listDocuments();
       const hasReady = docs.some((d) => d.status === 'ready');
       if (hasReady) {
         const chunks = await retrieveChunks(parsed.data.message);
         ragContext = formatRagContext(chunks) ?? undefined;
+        // Attach citations as a message annotation so the client can render a Sources panel
+        // (Why: StreamData annotations travel alongside the SSE stream and are attached to the
+        //  assistant message by the useChat hook — keeping UI and text in sync)
+        if (chunks.length > 0) {
+          streamData = new StreamData();
+          // JSON.parse/stringify ensures the value satisfies JSONValue (which requires an index
+          // signature that the Citation interface intentionally omits for clean typing)
+          streamData.appendMessageAnnotation(
+            JSON.parse(JSON.stringify({ citations: formatCitations(chunks) }))
+          );
+        }
       }
     } catch (ragErr) {
       // Ollama unreachable or other retrieval error — proceed without RAG context
@@ -47,8 +60,15 @@ export async function POST(req: NextRequest) {
 
     // Delegate to chat service which handles DB operations, context window, and LLM streaming
     const result = await handleChatMessage({ ...parsed.data, ragContext });
+
+    // Close the StreamData after the full response has streamed so the SSE data channel ends cleanly
+    if (streamData) {
+      const data = streamData;
+      result.text.finally(() => data.close());
+    }
+
     // Convert the AI SDK stream result to an SSE response for the useChat hook
-    return result.toDataStreamResponse();
+    return result.toDataStreamResponse(streamData ? { data: streamData } : undefined);
   } catch (err) {
     // Map known error messages to appropriate HTTP status codes
     // (Why: provides meaningful error responses instead of generic 500s)

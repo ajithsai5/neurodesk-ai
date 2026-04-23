@@ -7,7 +7,9 @@
  * (Why: nomic-embed-text via Ollama satisfies FR-010 local-only requirement)
  */
 
-const OLLAMA_BASE_URL = 'http://localhost:11434';
+// Use 127.0.0.1 explicitly — Node.js/Undici resolves 'localhost' to ::1 (IPv6) first,
+// but Ollama only listens on IPv4, so the connection fails with 'localhost'.
+const OLLAMA_BASE_URL = 'http://127.0.0.1:11434';
 const EMBEDDING_MODEL = 'nomic-embed-text';
 const EXPECTED_DIMS = 768;
 

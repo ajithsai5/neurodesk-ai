@@ -63,7 +63,7 @@ vi.mock('@/modules/rag/embedding-client', () => ({
   EmbeddingError: class EmbeddingError extends Error {},
 }));
 
-import { retrieveChunks, formatRagContext } from '@/modules/rag/retrieval-service';
+import { retrieveChunks, formatRagContext, formatCitations } from '@/modules/rag/retrieval-service';
 import type { RetrievedChunk } from '@/modules/rag/retrieval-service';
 
 // ---------------------------------------------------------------------------
@@ -134,6 +134,35 @@ describe('formatRagContext', () => {
     ];
     const result = formatRagContext(chunks)!;
     expect(result).toMatch(/not in the documents/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatCitations — pure function, no DB (T033)
+// ---------------------------------------------------------------------------
+
+describe('formatCitations', () => {
+  it('returns an empty array for empty chunks', () => {
+    expect(formatCitations([])).toEqual([]);
+  });
+
+  it('maps each chunk to a Citation with documentName, pageNumber, and excerpt', () => {
+    const chunks: RetrievedChunk[] = [
+      { chunkId: 1, content: 'Quantum computing uses qubits.', pageNumber: 3, documentName: 'quantum.pdf', distance: 0.1 },
+      { chunkId: 2, content: 'Superposition allows parallel states.', pageNumber: 5, documentName: 'quantum.pdf', distance: 0.2 },
+    ];
+    const result = formatCitations(chunks);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ documentName: 'quantum.pdf', pageNumber: 3, excerpt: 'Quantum computing uses qubits.' });
+    expect(result[1]).toEqual({ documentName: 'quantum.pdf', pageNumber: 5, excerpt: 'Superposition allows parallel states.' });
+  });
+
+  it('produces [DocumentName, Page N] label strings from each citation', () => {
+    const chunks: RetrievedChunk[] = [
+      { chunkId: 1, content: 'Content here.', pageNumber: 7, documentName: 'report.pdf', distance: 0.05 },
+    ];
+    const [citation] = formatCitations(chunks);
+    expect(`[${citation!.documentName}, Page ${citation!.pageNumber}]`).toBe('[report.pdf, Page 7]');
   });
 });
 

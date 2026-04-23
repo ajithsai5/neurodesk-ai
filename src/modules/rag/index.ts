@@ -18,8 +18,8 @@
  */
 
 export { ingestDocument, chunkText } from './ingestion-pipeline';
-export { retrieveChunks, formatRagContext } from './retrieval-service';
-export type { RetrievedChunk } from './retrieval-service';
+export { retrieveChunks, formatRagContext, formatCitations } from './retrieval-service';
+export type { RetrievedChunk, Citation } from './retrieval-service';
 export {
   createDocument,
   listDocuments,
