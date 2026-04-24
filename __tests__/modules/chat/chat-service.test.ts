@@ -352,4 +352,106 @@ describe('handleChatMessage', () => {
     const callArgs = (streamChatResponse as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(callArgs.messages.length).toBe(10);
   });
+
+  // ─────────────────────────────────────────────
+  // T022 — Graph code-entity enrichment (F02.5 + F02 merge)
+  // Covers the graph enrichment block in chat-service.ts (lines 68-87).
+  // Before these tests queryCodeEntities was mocked to return [], so the
+  // if-branch and catch block never executed → coverage drag on the merge.
+  // ─────────────────────────────────────────────
+  it('T022: appends CODE_ENTITY context to system prompt when graph has matching entities', async () => {
+    const { db } = await import('@/modules/shared/db');
+    const { queryCodeEntities } = await import('@/modules/graph/graph-service');
+
+    (db.get as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(fakeConversation)
+      .mockReturnValueOnce(fakePersona)
+      .mockReturnValueOnce(fakeProvider);
+    (db.all as ReturnType<typeof vi.fn>).mockReturnValueOnce([]);
+
+    // Return three code entities exercising every branch of the entity summary:
+    //   1. fully-populated properties → happy path (both ?? operands defined)
+    //   2. empty-object properties   → both `kind ?? 'symbol'` and `filePath ?? 'unknown'` fall back
+    //   3. malformed JSON            → JSON.parse throws → inner catch fallback
+    (queryCodeEntities as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      {
+        id: 'sym-1',
+        type: 'CODE_ENTITY',
+        label: 'handleChatMessage',
+        properties: JSON.stringify({ kind: 'function', filePath: 'src/modules/chat/chat-service.ts' }),
+      },
+      {
+        id: 'sym-2',
+        type: 'CODE_ENTITY',
+        label: 'partialSymbol',
+        properties: JSON.stringify({}), // triggers both ?? fallbacks on line 77
+      },
+      {
+        id: 'sym-3',
+        type: 'CODE_ENTITY',
+        label: 'brokenSymbol',
+        properties: '{not-valid-json', // forces JSON.parse to throw → catch fallback
+      },
+    ]);
+
+    await handleChatMessage({ conversationId: 'conv-1', message: 'What does handleChatMessage do?' });
+
+    const callArgs = (streamChatResponse as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    // Happy-path entity: both kind and filePath should render in the summary line
+    expect(callArgs.systemPrompt).toContain('## Relevant Codebase Symbols');
+    expect(callArgs.systemPrompt).toContain('function `handleChatMessage`');
+    expect(callArgs.systemPrompt).toContain('src/modules/chat/chat-service.ts');
+    // Partial-properties entity: both fallbacks fire ('symbol' kind, 'unknown' filePath)
+    expect(callArgs.systemPrompt).toContain('symbol `partialSymbol` in unknown');
+    // Malformed-properties entity: falls back to the inner catch form `symbol \`<label>\``
+    expect(callArgs.systemPrompt).toContain('symbol `brokenSymbol`');
+  });
+
+  it('T022b: prepends ragContext to system prompt when RAG is supplied', async () => {
+    const { db } = await import('@/modules/shared/db');
+    (db.get as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(fakeConversation)
+      .mockReturnValueOnce(fakePersona)
+      .mockReturnValueOnce(fakeProvider);
+    (db.all as ReturnType<typeof vi.fn>).mockReturnValueOnce([]);
+
+    await handleChatMessage({
+      conversationId: 'conv-1',
+      message: 'Hello',
+      // Simulated RAG retrieval output prepended by the API route
+      ragContext: '## Retrieved Documents\n- Quantum computing primer, page 3',
+    });
+
+    const callArgs = (streamChatResponse as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    // RAG block must appear BEFORE the persona prompt
+    const ragIdx = callArgs.systemPrompt.indexOf('Quantum computing primer');
+    const personaIdx = callArgs.systemPrompt.indexOf('You are a helpful tutor.');
+    expect(ragIdx).toBeGreaterThanOrEqual(0);
+    expect(personaIdx).toBeGreaterThan(ragIdx);
+  });
+
+  it('T022c: continues (degraded) when graph code-entity enrichment throws', async () => {
+    const { db } = await import('@/modules/shared/db');
+    const { queryCodeEntities } = await import('@/modules/graph/graph-service');
+
+    (db.get as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(fakeConversation)
+      .mockReturnValueOnce(fakePersona)
+      .mockReturnValueOnce(fakeProvider);
+    (db.all as ReturnType<typeof vi.fn>).mockReturnValueOnce([]);
+
+    // Graph service failure must not propagate — chat must still stream.
+    (queryCodeEntities as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('graph DB unavailable'),
+    );
+
+    const result = await handleChatMessage({ conversationId: 'conv-1', message: 'Hello' });
+
+    expect(result.toDataStreamResponse).toBeDefined();
+    const callArgs = (streamChatResponse as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    // System prompt must NOT contain the code-symbols section when enrichment failed
+    expect(callArgs.systemPrompt).not.toContain('## Relevant Codebase Symbols');
+    // But the base persona prompt is still there
+    expect(callArgs.systemPrompt).toContain('You are a helpful tutor.');
+  });
 });
