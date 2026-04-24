@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // File: src/app/api/conversations/[id]/route.ts
 /**
  * Single Conversation API Route Handler

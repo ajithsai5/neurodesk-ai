@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // File: src/app/api/personas/route.ts
 /**
  * Personas API Route Handler

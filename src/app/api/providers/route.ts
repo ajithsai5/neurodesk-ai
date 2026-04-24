@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // File: src/app/api/providers/route.ts
 /**
  * Providers API Route Handler

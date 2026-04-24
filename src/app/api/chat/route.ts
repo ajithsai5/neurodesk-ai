@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // File: src/app/api/chat/route.ts
 /**
  * Chat API Route Handler

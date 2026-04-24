@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // File: src/app/api/health/route.ts
 /**
  * Health Check API Route Handler

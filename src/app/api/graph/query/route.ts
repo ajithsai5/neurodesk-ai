@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // File: src/app/api/graph/query/route.ts
 /**
  * Graph Query API Route Handler
