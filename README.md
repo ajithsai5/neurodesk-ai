@@ -3,7 +3,7 @@
 [![CI](https://github.com/ajithsai5/neurodesk-ai/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/ajithsai5/neurodesk-ai/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/Coverage-91%25-83A603.svg)](https://github.com/ajithsai5/neurodesk-ai/actions)
 [![CodeQL](https://github.com/ajithsai5/neurodesk-ai/security/code-scanning/badge.svg)](https://github.com/ajithsai5/neurodesk-ai/security/code-scanning)
-[![Node](https://img.shields.io/badge/Node-18%20%7C%2020-339933?logo=nodedotjs)](package.json)
+[![Node](https://img.shields.io/badge/Node-20%20%7C%2022-339933?logo=nodedotjs)](package.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Last Commit](https://img.shields.io/github/last-commit/ajithsai5/neurodesk-ai)](https://github.com/ajithsai5/neurodesk-ai/commits/master)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Ajith%20Mandava-0A66C2?logo=linkedin)](https://www.linkedin.com/in/sri-sai-ajith-mandava-ba73a7183/)
@@ -205,8 +205,8 @@ npm run test:e2e          # End-to-end via Playwright (requires running dev serv
 | Job | Node | Description |
 |-----|------|-------------|
 | `Lint` | 20 | ESLint on all source files |
-| `Test (18)` | 18 | Full test suite + coverage upload |
-| `Test (20)` | 20 | Full test suite + coverage artifact |
+| `Test (20)` | 20 | Full test suite + coverage upload |
+| `Test (22)` | 22 | Full test suite + coverage artifact |
 | `Build` | 20 | `npm run build` + `npx tsc --noEmit` |
 | `Coverage Comment` | — | Posts coverage delta as PR comment |
 

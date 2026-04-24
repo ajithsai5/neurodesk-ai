@@ -32,14 +32,15 @@ jobs:
         run: npm run lint
 
 # ─── Job: test ────────────────────────────────────────────────────────────────
-# Runs the full test suite with coverage on both Node 18 and Node 20 (FR-006).
+# Runs the full test suite with coverage on Node 20 and 22 (FR-006).
+# Node 18 dropped: jsdom 29's @exodus/bytes dep requires Node ^20.19 || ^22.12.
 # Coverage artifacts are uploaded for consumption by the coverage-comment job.
   test:
     name: Test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: ['18', '20']
+        node-version: ['20', '22']
     steps:
       - uses: actions/checkout@v4
 
