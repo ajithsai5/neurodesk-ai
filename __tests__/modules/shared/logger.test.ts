@@ -97,3 +97,60 @@ describe('logger (NODE_ENV=development — active output)', () => {
     expect(logSpy).not.toHaveBeenCalled(); // must NOT use console.log for info level
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T017 — Per-level JSON output assertions (development mode, NODE_ENV bypass)
+// Each group verifies: JSON.parse output has `level`, `message`, `timestamp`
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('logger level: debug — JSON output in development', () => {
+  it('outputs JSON with level="debug", message, and timestamp', () => {
+    (process.env as Record<string, string>).NODE_ENV = 'development';
+    const spy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    logger.debug('debug message');
+    expect(spy).toHaveBeenCalledOnce();
+    const output = JSON.parse(spy.mock.calls[0][0]);
+    expect(output.level).toBe('debug');
+    expect(output.message).toBe('debug message');
+    expect(output.timestamp).toBeDefined();
+  });
+});
+
+describe('logger level: info — JSON output in development', () => {
+  it('outputs JSON with level="info", message, and timestamp', () => {
+    (process.env as Record<string, string>).NODE_ENV = 'development';
+    const spy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    logger.info('info message');
+    expect(spy).toHaveBeenCalledOnce();
+    const output = JSON.parse(spy.mock.calls[0][0]);
+    expect(output.level).toBe('info');
+    expect(output.message).toBe('info message');
+    expect(output.timestamp).toBeDefined();
+  });
+});
+
+describe('logger level: warn — JSON output in development', () => {
+  it('outputs JSON with level="warn", message, and timestamp', () => {
+    (process.env as Record<string, string>).NODE_ENV = 'development';
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    logger.warn('warn message');
+    expect(spy).toHaveBeenCalledOnce();
+    const output = JSON.parse(spy.mock.calls[0][0]);
+    expect(output.level).toBe('warn');
+    expect(output.message).toBe('warn message');
+    expect(output.timestamp).toBeDefined();
+  });
+});
+
+describe('logger level: error — JSON output in development', () => {
+  it('outputs JSON with level="error", message, and timestamp', () => {
+    (process.env as Record<string, string>).NODE_ENV = 'development';
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    logger.error('error message');
+    expect(spy).toHaveBeenCalledOnce();
+    const output = JSON.parse(spy.mock.calls[0][0]);
+    expect(output.level).toBe('error');
+    expect(output.message).toBe('error message');
+    expect(output.timestamp).toBeDefined();
+  });
+});

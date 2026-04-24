@@ -287,4 +287,69 @@ describe('handleChatMessage', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((db as any).set).toHaveBeenCalled();
   });
+
+  // ─────────────────────────────────────────────
+  // T019 — LLM client throws → error propagates
+  // ─────────────────────────────────────────────
+  it('T019: propagates error when streamChatResponse throws', async () => {
+    const { db } = await import('@/modules/shared/db');
+    (db.get as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(fakeConversation)
+      .mockReturnValueOnce(fakePersona)
+      .mockReturnValueOnce(fakeProvider);
+    (db.all as ReturnType<typeof vi.fn>).mockReturnValueOnce([]);
+
+    // Make the LLM client throw a hard error
+    (streamChatResponse as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('LLM provider connection refused')
+    );
+
+    // handleChatMessage must re-throw (not swallow) LLM errors
+    // so the route handler can return the correct HTTP status
+    await expect(
+      handleChatMessage({ conversationId: 'conv-1', message: 'Hello' })
+    ).rejects.toThrow('LLM provider connection refused');
+  });
+
+  // ─────────────────────────────────────────────
+  // T020 — >20 messages trimmed before LLM call
+  // ─────────────────────────────────────────────
+  it('T020: passes ≤20 messages to LLM when conversation history has >20 messages', async () => {
+    const { db } = await import('@/modules/shared/db');
+
+    (db.get as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(fakeConversation)
+      .mockReturnValueOnce(fakePersona)
+      .mockReturnValueOnce(fakeProvider);
+
+    // Simulate 30 messages stored in DB — context window must trim to ≤20
+    const thirtyMessages = makeMessages(30);
+    (db.all as ReturnType<typeof vi.fn>).mockReturnValueOnce(thirtyMessages);
+
+    await handleChatMessage({ conversationId: 'conv-1', message: 'Trimming test' });
+
+    const callArgs = (streamChatResponse as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    // After context-window trim-by-count (maxMessages=20), at most 20 messages are sent
+    expect(callArgs.messages.length).toBeLessThanOrEqual(20);
+    // The most recent message (index 29) must be retained
+    expect(callArgs.messages[callArgs.messages.length - 1].content).toBe('Message 29');
+  });
+
+  it('T020b: all messages are kept when history is under the count and token cap', async () => {
+    const { db } = await import('@/modules/shared/db');
+
+    (db.get as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(fakeConversation)
+      .mockReturnValueOnce(fakePersona)
+      .mockReturnValueOnce(fakeProvider);
+
+    // 10 short messages — should all pass through the context window untouched
+    const tenMessages = makeMessages(10);
+    (db.all as ReturnType<typeof vi.fn>).mockReturnValueOnce(tenMessages);
+
+    await handleChatMessage({ conversationId: 'conv-1', message: 'Short history' });
+
+    const callArgs = (streamChatResponse as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(callArgs.messages.length).toBe(10);
+  });
 });
