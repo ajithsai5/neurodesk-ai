@@ -31,6 +31,12 @@
     "uuid": "11.1.0",
     "zod": "3.25.76"
   },
+  "overrides": {
+    "@next/eslint-plugin-next": {
+      "glob": ">=10.5.0"
+    },
+    "jsondiffpatch": ">=0.7.2"
+  },
   "devDependencies": {
     "@playwright/test": "~1.59.1",
     "@testing-library/dom": "~10.4.1",
