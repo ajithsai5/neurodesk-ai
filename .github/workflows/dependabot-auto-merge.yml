@@ -1,0 +1,39 @@
+name: Dependabot Auto-Merge
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+# Only runs for Dependabot PRs — auto-merges patch-level bumps via squash.
+# Minor and major bumps are left for manual review (FR-010, research.md §5).
+jobs:
+  auto-merge:
+    name: Auto-merge patch bumps
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    permissions:
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: Auto-merge patch bump PRs
+        # Only merge when the PR title matches the pattern for a patch-level bump.
+        # Example: "Bump eslint from 8.56.0 to 8.57.0" matches; minor/major do not.
+        if: >
+          contains(github.event.pull_request.title, 'bump') &&
+          startsWith(github.event.pull_request.title, 'Bump ') == false ||
+          github.event.pull_request.title != ''
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # The regex check: patch bump pattern is "bump <pkg> from X.Y.Z to X.Y.Z2"
+        # where major.minor are the same (only patch digit differs).
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          # Match: "Bump <name> from M.N.P to M.N.Q" (patch-only: same major.minor)
+          if echo "$TITLE" | grep -qE '^[Bb]ump .+ from ([0-9]+)\.([0-9]+)\.[0-9]+ to \1\.\2\.[0-9]+$'; then
+            echo "Patch-level bump detected — enabling auto-merge."
+            gh pr merge --auto --squash "$PR_URL"
+          else
+            echo "Non-patch bump (minor or major) — skipping auto-merge. Manual review required."
+          fi

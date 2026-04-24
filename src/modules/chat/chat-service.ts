@@ -15,6 +15,7 @@ import { streamChatResponse } from './llm-client';
 import { applyContextWindow } from './context-window';
 import { config } from '@/lib/config';
 import { logger } from '@/modules/shared/logger';
+import { queryCodeEntities, writeConversationNode } from '@/modules/graph/graph-service';
 import type { ChatRequest, ChatMessage } from './types';
 
 // Handle an incoming chat message: validate, persist, build context, stream LLM response
@@ -56,7 +57,28 @@ export async function handleChatMessage(input: ChatRequest) {
     logger.warn('Persona not found, using default', { personaId: conversation.personaId });
   }
 
-  const systemPrompt = persona?.systemPrompt ?? 'You are a helpful AI assistant.';
+  let systemPrompt = persona?.systemPrompt ?? 'You are a helpful AI assistant.';
+
+  // Enrich the system prompt with relevant CODE_ENTITY nodes from the graph (FR-017).
+  // Wrapped in try/catch — graph enrichment failure must never block the chat response.
+  try {
+    const codeEntities = await queryCodeEntities(conversationId, message);
+    if (codeEntities.length > 0) {
+      const entitySummary = codeEntities
+        .map((e) => {
+          try {
+            const props = JSON.parse(e.properties) as { kind?: string; filePath?: string };
+            return `${props.kind ?? 'symbol'} \`${e.label}\` in ${props.filePath ?? 'unknown'}`;
+          } catch {
+            return `symbol \`${e.label}\``;
+          }
+        })
+        .join('\n');
+      systemPrompt = `${systemPrompt}\n\n## Relevant Codebase Symbols\n${entitySummary}`;
+    }
+  } catch (err) {
+    logger.warn('[ChatService] Graph code-entity enrichment failed (degraded)', { err: String(err) });
+  }
 
   // Load provider config to determine which LLM to call
   // (Why: provider config maps to the specific AI SDK instance and model)
@@ -152,6 +174,12 @@ export async function handleChatMessage(input: ChatRequest) {
       .set({ updatedAt: new Date().toISOString() })
       .where(eq(conversations.id, conversationId))
       .run();
+
+    // Write the assistant's response as a MESSAGE node to the knowledge graph (FR-017).
+    // Fire-and-forget with silent degradation — graph failure must not affect the user.
+    writeConversationNode(conversationId, conversationId, fullText.slice(0, 500)).catch(() => {
+      // Silently degrade — writeConversationNode has its own internal logger.warn
+    });
   }).catch((err) => {
     // Log but don't throw — the user already received the streamed response
     // (Why: failing to save shouldn't crash the response that already streamed)

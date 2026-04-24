@@ -1,0 +1,41 @@
+name: CodeQL
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  # Weekly scan every Monday at 03:00 UTC (FR-014, research.md §3)
+  schedule:
+    - cron: '0 3 * * 1'
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    permissions:
+      # Required for CodeQL to read source and upload results to GitHub Security tab
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          # javascript-typescript covers both .js and .ts files (research.md §3)
+          languages: javascript-typescript
+
+      - name: Autobuild
+        # Autobuild works for Next.js projects without additional configuration
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:javascript-typescript

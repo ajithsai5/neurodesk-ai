@@ -101,6 +101,19 @@ describe('POST /api/chat', () => {
     expect(body.error).toBe('AI service unavailable');
   });
 
+  // T011b — generic unexpected error → 500 "Internal server error" (covers route.ts lines 54-56)
+  it('should return 500 with generic message for unexpected errors', async () => {
+    const { handleChatMessage } = await import('@/modules/chat');
+    (handleChatMessage as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('Database connection failed')
+    );
+    const req = makeRequest({ conversationId: VALID_CONV_ID, message: 'Hi' });
+    const res = await POST(req as any);
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe('Internal server error');
+  });
+
   // T012 — verify handleChatMessage is called with correct arguments
   it('should call handleChatMessage with conversationId and message', async () => {
     const { handleChatMessage } = await import('@/modules/chat');

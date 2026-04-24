@@ -18,6 +18,12 @@ vi.mock('@/modules/shared/db', () => {
   };
 });
 
+// Mock graph-service so the DELETE handler's cascadeDeleteConversation call
+// doesn't try to hit the real DB (graph module added in T047)
+vi.mock('@/modules/graph/graph-service', () => ({
+  cascadeDeleteConversation: vi.fn().mockResolvedValue(undefined),
+}));
+
 // uuid is used to generate conversation IDs in the POST handler
 vi.mock('uuid', () => ({ v4: vi.fn(() => 'test-conv-uuid') }));
 
@@ -96,7 +102,8 @@ describe('GET /api/conversations', () => {
     const req = makeListReq('status=archived');
     await listGET(req);
     // The where clause should have been invoked (status filter applied)
-    expect(db.where).toHaveBeenCalled();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((db as any).where).toHaveBeenCalled();
   });
 });
 
@@ -134,6 +141,61 @@ describe('POST /api/conversations', () => {
     });
     const res = await listPOST(req);
     expect(res.status).toBe(201);
+  });
+
+  // T018a — invalid body (covers route.ts lines 48-52)
+  it('should return 400 for invalid creation body', async () => {
+    const req = makeJsonReq('http://localhost/api/conversations', 'POST', {
+      personaId: 'not-a-uuid',
+    });
+    const res = await listPOST(req);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Invalid input');
+  });
+
+  // T018a2 — no personas configured (covers route.ts lines 60-61)
+  it('should return 500 when no default persona exists', async () => {
+    const { db } = await import('@/modules/shared/db');
+    (db.get as ReturnType<typeof vi.fn>).mockReturnValueOnce(undefined); // no persona
+    const req = makeJsonReq('http://localhost/api/conversations', 'POST', {});
+    const res = await listPOST(req);
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe('No personas configured');
+  });
+
+  // T018b — no providers available (covers route.ts lines 77-78)
+  it('should return 500 when no default provider exists', async () => {
+    const { db } = await import('@/modules/shared/db');
+    // First get = defaultPersona (found), second get = defaultProvider (not found)
+    (db.get as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(fakePersona)
+      .mockReturnValueOnce(undefined); // no provider
+
+    const req = makeJsonReq('http://localhost/api/conversations', 'POST', {});
+    const res = await listPOST(req);
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe('No providers available');
+  });
+
+  // T018c — catch block covers lines 103-106
+  it('should return 500 on unexpected DB error during creation', async () => {
+    const { db } = await import('@/modules/shared/db');
+    (db.get as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(fakePersona)
+      .mockReturnValueOnce(fakeProvider);
+    // Make db.insert throw
+    (db.insert as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new Error('DB error');
+    });
+
+    const req = makeJsonReq('http://localhost/api/conversations', 'POST', {});
+    const res = await listPOST(req);
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe('Internal server error');
   });
 });
 
@@ -183,6 +245,32 @@ describe('PATCH /api/conversations/:id', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.title).toBe('New Title');
+  });
+
+  // T021a — PATCH updates personaId and providerId (covers [id]/route.ts lines 74-75)
+  it('should update personaId and providerId fields', async () => {
+    const { db } = await import('@/modules/shared/db');
+    (db.get as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(fakeConv)
+      .mockReturnValueOnce({ ...fakeConv, personaId: 'p-2', providerId: 'pr-2' });
+    const req = makeJsonReq('http://localhost/api/conversations/conv-1', 'PATCH', {
+      personaId: 'a0000000-0000-4000-a000-000000000002',
+      providerId: 'b0000000-0000-4000-b000-000000000002',
+    });
+    const res = await convPATCH(req, makeParams('conv-1'));
+    expect(res.status).toBe(200);
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  // T021b — 404 when conversation not found on PATCH (covers [id]/route.ts lines 57-58)
+  it('should return 404 when conversation not found on PATCH', async () => {
+    const { db } = await import('@/modules/shared/db');
+    (db.get as ReturnType<typeof vi.fn>).mockReturnValueOnce(undefined);
+    const req = makeJsonReq('http://localhost/api/conversations/bad-id', 'PATCH', { title: 'New' });
+    const res = await convPATCH(req, makeParams('bad-id'));
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toBe('Conversation not found');
   });
 
   // T022 — reject empty title
@@ -249,6 +337,28 @@ describe('POST /api/conversations/:id/archive', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.status).toBe('archived');
+  });
+
+  // Archive: 404 when conversation not found (covers archive/route.ts lines 31-32)
+  it('should return 404 when conversation not found on archive', async () => {
+    const { db } = await import('@/modules/shared/db');
+    (db.get as ReturnType<typeof vi.fn>).mockReturnValueOnce(undefined);
+    const req = makeJsonReq('http://localhost/api/conversations/bad-id/archive', 'POST', { archived: true });
+    const res = await archivePOST(req, makeParams('bad-id'));
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toBe('Conversation not found');
+  });
+
+  // Archive: 400 for invalid body (covers archive/route.ts lines 38-42)
+  it('should return 400 for invalid archive body', async () => {
+    const { db } = await import('@/modules/shared/db');
+    (db.get as ReturnType<typeof vi.fn>).mockReturnValueOnce(fakeConv);
+    const req = makeJsonReq('http://localhost/api/conversations/conv-1/archive', 'POST', { archived: 'yes' });
+    const res = await archivePOST(req, makeParams('conv-1'));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Invalid input');
   });
 
   // Archive: unarchive a conversation

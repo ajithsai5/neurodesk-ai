@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # Daily npm dependency updates (FR-010)
+  # Patch-level updates auto-merge via dependabot-auto-merge.yml workflow.
+  # Minor and major updates require manual review.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: daily
+    open-pull-requests-limit: 10
+    groups:
+      # Group all patch-level updates into a single PR for easier review
+      patch-updates:
+        update-types:
+          - patch
+
+  # Weekly GitHub Actions dependency updates (FR-010, research.md §5)
+  # Actions can have security implications — weekly cadence balances freshness with review burden.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
