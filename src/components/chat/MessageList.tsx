@@ -12,12 +12,27 @@
 import { useEffect, useRef } from 'react';
 import { StreamingMessage } from './StreamingMessage';
 import type { Message } from 'ai';
+import type { Citation } from '@/modules/rag';
 
 // @field messages - Array of messages from the Vercel AI SDK useChat hook
 // @field isLoading - Whether the AI is currently generating a response
 interface MessageListProps {
   messages: Message[];
   isLoading: boolean;
+}
+
+// Extract Citation objects from a useChat message's annotations array.
+// The chat route encodes citations as { citations: Citation[] } in a message annotation.
+// Returns an empty array when no annotation is present or when the message has no sources.
+function extractCitations(annotations?: Message['annotations']): Citation[] {
+  if (!annotations) return [];
+  for (const annotation of annotations) {
+    if (annotation && typeof annotation === 'object' && 'citations' in annotation) {
+      const cits = (annotation as unknown as { citations: Citation[] }).citations;
+      if (Array.isArray(cits)) return cits;
+    }
+  }
+  return [];
 }
 
 // Render the scrollable message list with auto-scroll and empty state
@@ -54,12 +69,16 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
         const isLastAssistant =
           msg.role === 'assistant' && i === messages.length - 1 && isLoading;
 
+        // Extract citations from the message annotation added by the chat route (US4)
+        const citations = msg.role === 'assistant' ? extractCitations(msg.annotations) : [];
+
         return (
           <StreamingMessage
             key={msg.id}
             content={msg.content}
             role={msg.role as 'user' | 'assistant'}
             isStreaming={isLastAssistant}
+            citations={citations}
           />
         );
       })}

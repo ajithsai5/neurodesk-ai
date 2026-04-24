@@ -23,7 +23,7 @@ import type { ChatRequest, ChatMessage } from './types';
 // @param input - Validated chat request containing conversationId and message text
 // @returns - Vercel AI SDK stream result for SSE response to client
 export async function handleChatMessage(input: ChatRequest) {
-  const { conversationId, message } = input;
+  const { conversationId, message, ragContext } = input;
 
   // Load conversation from DB and verify it exists and is active
   // (Why: archived conversations should not accept new messages)
@@ -57,9 +57,15 @@ export async function handleChatMessage(input: ChatRequest) {
     logger.warn('Persona not found, using default', { personaId: conversation.personaId });
   }
 
-  let systemPrompt = persona?.systemPrompt ?? 'You are a helpful AI assistant.';
+  // Start with the persona's base system prompt (falls back to a generic assistant prompt)
+  const basePrompt = persona?.systemPrompt ?? 'You are a helpful AI assistant.';
 
-  // Enrich the system prompt with relevant CODE_ENTITY nodes from the graph (FR-017).
+  // Prepend RAG context when documents are available (F02 — FR-017)
+  // (Why: the system prompt is not subject to context-window trimming, so it is the safest place
+  //  to inject retrieved document snippets — they survive even after many turns.)
+  let systemPrompt = ragContext ? `${ragContext}\n\n${basePrompt}` : basePrompt;
+
+  // Additionally enrich with relevant CODE_ENTITY nodes from the knowledge graph (F02.5 — FR-017).
   // Wrapped in try/catch — graph enrichment failure must never block the chat response.
   try {
     const codeEntities = await queryCodeEntities(conversationId, message);

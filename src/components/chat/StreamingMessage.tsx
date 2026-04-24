@@ -12,14 +12,18 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+import { CitationPanel } from '@/components/CitationPanel';
+import type { Citation } from '@/modules/rag';
 
 // @field content - The message text to display
 // @field role - Whether this is a user or assistant message (controls styling)
 // @field isStreaming - Whether the assistant is still generating this message
+// @field citations - Source citations to display below assistant messages (US4)
 interface StreamingMessageProps {
   content: string;
   role: 'user' | 'assistant';
   isStreaming?: boolean;
+  citations?: Citation[];
 }
 
 // Render a single chat message bubble with role-based styling
@@ -27,7 +31,8 @@ interface StreamingMessageProps {
 // @param content - Message text content
 // @param role - 'user' or 'assistant' — determines alignment and styling
 // @param isStreaming - Adds a cursor animation to the last assistant message while generating
-export function StreamingMessage({ content, role, isStreaming }: StreamingMessageProps) {
+// @param citations - Source citations shown in a collapsible panel below the message
+export function StreamingMessage({ content, role, isStreaming, citations = [] }: StreamingMessageProps) {
   const isUser = role === 'user';
 
   return (
@@ -44,12 +49,16 @@ export function StreamingMessage({ content, role, isStreaming }: StreamingMessag
         {isUser ? (
           <p className="whitespace-pre-wrap">{content}</p>
         ) : (
-          <div className={`prose prose-sm max-w-none ${isStreaming ? 'streaming-cursor' : ''}`}>
-            {/* ReactMarkdown with GFM tables/strikethrough and code syntax highlighting */}
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
-              {content}
-            </ReactMarkdown>
-          </div>
+          <>
+            <div className={`prose prose-sm max-w-none ${isStreaming ? 'streaming-cursor' : ''}`}>
+              {/* ReactMarkdown with GFM tables/strikethrough and code syntax highlighting */}
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+                {content}
+              </ReactMarkdown>
+            </div>
+            {/* CitationPanel renders below the message text when sources are available (US4) */}
+            <CitationPanel citations={citations} />
+          </>
         )}
       </div>
     </div>

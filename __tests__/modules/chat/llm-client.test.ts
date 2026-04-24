@@ -101,18 +101,19 @@ describe('T018: getLLMModel — Anthropic path isolation', () => {
 });
 
 describe('T018: getLLMModel — Ollama local path', () => {
-  it('throws "Unsupported provider" for ollama (not yet wired in switch)', () => {
-    // Ollama is not yet mapped in getLLMModel — verifies the guard throws cleanly
-    // rather than silently falling through or calling OpenAI/Anthropic
-    expect(() => getLLMModel('ollama', 'llama3.1:8b')).toThrow('Unsupported provider: ollama');
+  // After merging the F02 RAG feature, Ollama is now wired into getLLMModel via the
+  // OpenAI-compatible shim (createOpenAI pointed at http://127.0.0.1:11434/v1). These
+  // tests verify that ollama resolves to a model instance and, like the other providers,
+  // does not eagerly invoke streamText just by resolving the model.
+  it('returns a defined model instance for the ollama provider', () => {
+    const model = getLLMModel('ollama', 'llama3.1:8b');
+    expect(model).toBeDefined();
   });
 
-  it('does not call OpenAI factory when ollama is requested', async () => {
-    const { createOpenAI } = await import('@ai-sdk/openai');
-    vi.clearAllMocks();
-    try { getLLMModel('ollama', 'llama3.1:8b'); } catch { /* expected */ }
-    // streamText (OpenAI path) must NOT have been invoked
+  it('does not call streamText when only resolving the ollama model', async () => {
     const { streamText } = await import('ai');
+    vi.clearAllMocks();
+    getLLMModel('ollama', 'llama3.1:8b');
     expect(streamText).not.toHaveBeenCalled();
   });
 });

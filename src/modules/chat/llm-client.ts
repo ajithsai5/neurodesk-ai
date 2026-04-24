@@ -16,10 +16,18 @@ import type { StreamChatParams } from './types';
 const openai = createOpenAI({});
 const anthropic = createAnthropic({});
 
+// Ollama exposes an OpenAI-compatible API at localhost:11434/v1.
+// We reuse createOpenAI with a custom baseURL instead of adding a separate SDK dependency.
+// (Why: avoids adding ollama-ai-provider package; createOpenAI covers the same interface)
+const ollama = createOpenAI({
+  baseURL: 'http://localhost:11434/v1',
+  apiKey: 'ollama', // required by the SDK shape; Ollama ignores this value
+});
+
 // Resolve a provider name + model ID to a Vercel AI SDK model instance
 // To add a new provider: add a case here, install @ai-sdk/<provider>, and add a seed entry
-// @param providerName - Provider key from the database ('openai', 'anthropic')
-// @param modelId - Model identifier passed to the provider SDK (e.g., 'gpt-4o')
+// @param providerName - Provider key from the database ('openai', 'anthropic', 'ollama')
+// @param modelId - Model identifier passed to the provider SDK (e.g., 'gpt-4o', 'llama3.1:8b')
 // @returns - A Vercel AI SDK model instance ready for streaming
 export function getLLMModel(providerName: string, modelId: string) {
   switch (providerName) {
@@ -27,6 +35,8 @@ export function getLLMModel(providerName: string, modelId: string) {
       return openai(modelId);
     case 'anthropic':
       return anthropic(modelId);
+    case 'ollama':
+      return ollama(modelId);
     default:
       throw new Error(`Unsupported provider: ${providerName}`);
   }
