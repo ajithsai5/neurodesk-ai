@@ -59,7 +59,7 @@
     "autoprefixer": "~10.5.0",
     "coverage-badge-creator": "~2.1.0",
     "drizzle-kit": "0.31.10",
-    "eslint": "~8.57.1",
+    "eslint": "~10.2.1",
     "eslint-config-next": "~15.5.15",
     "jsdom": "~29.0.2",
     "postcss": "~8.5.10",
