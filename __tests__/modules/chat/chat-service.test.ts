@@ -25,6 +25,12 @@ vi.mock('@/modules/graph/graph-service', () => ({
   writeConversationNode: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Mock graphify-bridge so we control its output deterministically
+// (the real bridge looks for graphify-out/graph.json which isn't present in tests)
+vi.mock('@/modules/graph/graphify-bridge', () => ({
+  queryGraphifyEntities: vi.fn(() => []),
+}));
+
 vi.mock('@/modules/chat/llm-client', () => ({
   streamChatResponse: vi.fn(async () => ({
     textStream: (async function* () {
@@ -452,6 +458,49 @@ describe('handleChatMessage', () => {
     // System prompt must NOT contain the code-symbols section when enrichment failed
     expect(callArgs.systemPrompt).not.toContain('## Relevant Codebase Symbols');
     // But the base persona prompt is still there
+    expect(callArgs.systemPrompt).toContain('You are a helpful tutor.');
+  });
+
+  it('T022d: appends "## Graphify Knowledge Graph" block when bridge returns matches', async () => {
+    const { db } = await import('@/modules/shared/db');
+    const { queryGraphifyEntities } = await import('@/modules/graph/graphify-bridge');
+    (db.get as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(fakeConversation)
+      .mockReturnValueOnce(fakePersona)
+      .mockReturnValueOnce(fakeProvider);
+    (db.all as ReturnType<typeof vi.fn>).mockReturnValueOnce([]);
+    (queryGraphifyEntities as ReturnType<typeof vi.fn>).mockReturnValueOnce([
+      { label: 'fooFn()', filePath: 'src/foo.ts', location: 'L10', community: 1 },
+      { label: 'barFn()', filePath: 'src/bar.ts', location: 'L20', community: 1 },
+    ]);
+
+    await handleChatMessage({ conversationId: 'conv-1', message: 'foo' });
+
+    const callArgs = (streamChatResponse as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(callArgs.systemPrompt).toContain('## Graphify Knowledge Graph');
+    expect(callArgs.systemPrompt).toContain('`fooFn()`');
+    expect(callArgs.systemPrompt).toContain('src/foo.ts');
+    expect(callArgs.systemPrompt).toContain('(L10)');
+  });
+
+  it('T022e: continues (degraded) when graphify bridge throws', async () => {
+    const { db } = await import('@/modules/shared/db');
+    const { queryGraphifyEntities } = await import('@/modules/graph/graphify-bridge');
+    (db.get as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(fakeConversation)
+      .mockReturnValueOnce(fakePersona)
+      .mockReturnValueOnce(fakeProvider);
+    (db.all as ReturnType<typeof vi.fn>).mockReturnValueOnce([]);
+    (queryGraphifyEntities as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new Error('bridge exploded');
+    });
+
+    const result = await handleChatMessage({ conversationId: 'conv-1', message: 'foo' });
+
+    expect(result.toDataStreamResponse).toBeDefined();
+    const callArgs = (streamChatResponse as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    // No graphify section when the bridge throws
+    expect(callArgs.systemPrompt).not.toContain('## Graphify Knowledge Graph');
     expect(callArgs.systemPrompt).toContain('You are a helpful tutor.');
   });
 });

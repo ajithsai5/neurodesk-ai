@@ -225,3 +225,52 @@ A first-time contributor clones the repository, reads the README, and follows th
 - The evaluation set for measuring RAG retrieval quality improvement (SC-008) is a fixed set of 20–50 question–answer pairs defined before the sprint begins.
 - Screenshots and animated GIFs for the README are captured from the running local development instance; no dedicated staging environment is required.
 - Feature 03 development will not begin on the main branch until all success criteria for this sprint are met.
+
+---
+
+## Phase 8 — Gap Closure Amendment (added 2026-04-25)
+
+This amendment closes four gaps identified in post-implementation audit: the 95% aspirational
+coverage target was never met, all 11 open Dependabot alerts remained unaddressed, the README
+lacked the motivation/per-file/per-function/progression detail the user requested, and Graphify
+itself was substituted with an in-house graph store rather than installed and used.
+
+### Functional Requirements (Amendment)
+
+- **FR-033 (Coverage 95%)**: Aggregate test coverage MUST reach ≥ 95% for statements, branches,
+  functions, and lines on the merge to master, satisfying the SC-001 aspirational ceiling rather
+  than only the FR-001 90% floor. Backfill targets (current → required): `graph-client.ts`
+  (65.62% → 95%), `graph-service.ts` (88.88% → 95%), `app/api/chat/route.ts` (72.13% → 95%),
+  `GraphPanel.tsx` (71.01% → 95%), `ChatPanel.tsx` (78.09% → 95%), `MessageList.tsx`
+  (81.81% → 95%), `MessageInput.tsx` branches (78.57% → 95%).
+- **FR-034 (Dependabot zero-open)**: All 11 open Dependabot alerts MUST be closed before merge.
+  Severity-prioritised: HIGH (next < 15.5.15, drizzle-orm < 0.45.2, glob < 10.5.0) →
+  MEDIUM (uuid < 14, jsondiffpatch < 0.7.2, esbuild ≤ 0.24.2, next < 15.5.10/15.5.13/15.5.14) →
+  LOW (ai < 5.0.52). Each MUST either be patched (direct dep bump or npm `overrides` for
+  transitive) or formally dismissed with a written rationale.
+- **FR-035 (ai SDK lock)**: The `ai`/`@ai-sdk/openai`/`@ai-sdk/anthropic` major version MUST stay
+  on v4.x for this sprint. Bumping to ai 5.x breaks LanguageModelV1 → V3. Alert #3 (low severity)
+  MUST be dismissed with rationale "deferred to F03 — major-bump migration tracked separately."
+- **FR-036 (Graphify actually installed)**: Graphify MUST be installed locally as a development
+  tool (`pipx install graphifyy` — Python CLI) and run against `src/` to produce
+  `graphify-out/graph.json` and `graphify-out/GRAPH_REPORT.md`, both committed.
+- **FR-037 (Graphify Claude Code integration)**: The `graphify claude install` command MUST be
+  run so `.claude/settings.local.json` gets the PreToolUse hook and `CLAUDE.md` gets the
+  directive section that tells Claude to consult `graphify-out/GRAPH_REPORT.md` before Glob/Grep.
+- **FR-038 (Graphify chat retrieval enrichment)**: The chat service MUST read
+  `graphify-out/graph.json` at startup (best-effort) and use it to enrich the system prompt with
+  file/function context — alongside (not replacing) the existing in-house `queryCodeEntities()`.
+  Graceful degradation when `graph.json` is absent or unparseable.
+- **FR-039 (Expanded README)**: README MUST add four sections: "Why this project exists",
+  per-file index for `src/`, per-function API for every module, and "Progression from scratch"
+  changelog (F00 → F01 → F01.5 → F02 → F02.5).
+- **FR-040 (Verification gate)**: One CI run on this branch must show: coverage ≥ 95%, zero
+  open Dependabot alerts, `graphify-out/graph.json` exists, README sections present, and all
+  four CI jobs plus CodeQL green.
+
+### Success Criteria (Amendment)
+
+- **SC-010**: Aggregate coverage on the merge commit is ≥ 95% across all four metrics.
+- **SC-011**: Open Dependabot alerts = 0 (closed or dismissed-with-rationale).
+- **SC-012**: `graphify-out/graph.json` exists and PreToolUse hook is wired in `.claude/settings.local.json`.
+- **SC-013**: README contains the four new sections with non-stub content.

@@ -264,3 +264,82 @@ Phase 1 → Phase 2 → Phase 3 (US2)
 - **Phase 6 TDD order**: T049/T050/T052 test scaffolds MUST be written (as failing stubs) after T039 inspection and before T040–T048 implementation (Constitution Principle II)
 - Branch protection step (T029) requires manual GitHub UI access — cannot be automated from a branch
 - The `audit-before.json` in T032 is a one-time snapshot for audit trail; do not commit after the sprint
+
+---
+
+## Phase 8 — Gap Closure (added 2026-04-25)
+
+**Purpose**: Close four post-audit gaps — 95% coverage, Dependabot zero-open, real Graphify
+install, expanded README. Implements FR-033 through FR-040.
+
+### Track G — Dependabot zero-open
+
+- [ ] T063 [P] Add `"esbuild": ">=0.25.0"` to the `overrides` block in `package.json`; run
+  `npm install`; verify `npm ls esbuild` shows ≥ 0.25.0 everywhere.
+- [ ] T064 [P] Bump `uuid` from 11.1.0 to 14.0.0 in `package.json` dependencies (pinned, no `^`);
+  `npm install`; run `npm test` to confirm UUID-using tests still pass.
+- [ ] T065 Bump `next` from 14.2.35 to 15.5.15 in `package.json` dependencies; run `npm install`;
+  fix breaking changes: any `headers()`/`cookies()` calls become `await`; verify `npm run build`,
+  `npx tsc --noEmit`, `npm test`, `npm run test:e2e` all pass.
+- [ ] T066 Dismiss Dependabot alert #3 (`ai < 5.0.52`, severity low) with comment "Deferred to
+  F03 per FR-035 — ai SDK v4 → v5 is a major API break (LanguageModelV1 → V3) and out of scope
+  for 002.5 hardening." via `gh api -X PATCH repos/ajithsai5/neurodesk-ai/dependabot/alerts/3`.
+- [ ] T067 Verify zero open alerts: `gh api repos/ajithsai5/neurodesk-ai/dependabot/alerts --jq '[.[] | select(.state=="open")] | length'` returns 0.
+
+### Track H — Coverage to 95%
+
+- [ ] T068 [P] Backfill `__tests__/modules/graph/graph-client.test.ts` — cover catch-block
+  branches in `getStats()`, write-error degradation, `cascadeDeleteConversation` empty path.
+- [ ] T069 [P] Backfill `__tests__/modules/graph/graph-service.test.ts` — cover empty-store
+  paths in `queryCodeEntities`, error swallowing, write-failure degradation.
+- [ ] T070 [P] Backfill `__tests__/integration/api-chat.test.ts` — add 401 unauth path, Zod
+  validation failure, conversation-not-found 404.
+- [ ] T071 [P] Backfill `__tests__/components/GraphPanel.test.tsx` — cover empty-state render,
+  fetch-error render, node click handler.
+- [ ] T072 [P] Backfill `__tests__/components/ChatPanel.test.tsx` — cover submit-while-loading
+  guard, error toast branch.
+- [ ] T073 [P] Backfill `__tests__/components/MessageList.test.tsx` — assistant-streaming
+  branch, empty messages array path.
+- [ ] T074 [P] Backfill `__tests__/components/MessageInput.test.tsx` — 10k-char overflow guard,
+  Enter vs Shift+Enter branches.
+- [ ] T075 Bump coverage thresholds in `vitest.config.mts` from 90 to 95 for statements/branches/
+  functions/lines; run `npm test -- --coverage`; confirm all green.
+
+### Track I — Graphify install + integration
+
+- [ ] T076 Install Graphify locally: `pipx install graphifyy` (or `pip install graphifyy` if
+  pipx unavailable); document in README setup as a Python prerequisite.
+- [ ] T077 Add `"graphify:build": "graphify build src/ --output graphify-out"` to `package.json`
+  scripts; run it from repo root to produce `graphify-out/graph.json` and `GRAPH_REPORT.md`.
+- [ ] T078 Add `graphify-out/cache/` and `graphify-out/transcripts/` to `.gitignore`; commit
+  `graphify-out/graph.json` and `graphify-out/GRAPH_REPORT.md`.
+- [ ] T079 Run `graphify claude install` to wire the PreToolUse hook into
+  `.claude/settings.local.json` and append the directive section to `CLAUDE.md`.
+- [ ] T080 Create `src/modules/graph/graphify-bridge.ts` — exports `loadGraphifyIndex()` and
+  `queryGraphifyEntities(query: string, limit?: number)`; both return `null`/`[]` on file
+  missing or parse error (graceful degradation).
+- [ ] T081 [P] Wire `queryGraphifyEntities()` into `src/modules/chat/chat-service.ts` after the
+  existing in-house `queryCodeEntities()` block — append a `## Graphify Knowledge Graph`
+  section to the system prompt with the matched entities.
+- [ ] T082 [P] Add `__tests__/modules/graph/graphify-bridge.test.ts` covering: file-missing
+  returns `null`, malformed JSON returns `null`, happy-path query returns matched entities,
+  empty-query returns empty array.
+
+### Track J — Expanded README
+
+- [ ] T083 Add "Why this project exists" section to `README.md` — problem statement, target
+  user, alternatives considered (Cursor, Claude Code, ChatGPT, custom RAG stacks).
+- [ ] T084 Add "Per-file Index" section to `README.md` — table covering every file in `src/`
+  with columns File / Purpose / Public exports.
+- [ ] T085 Add "Per-function API" section to `README.md` — function signatures and 1-2 sentence
+  purpose for the public surface of `chat`, `graph`, `rag`, `shared` modules.
+- [ ] T086 Add "Progression Changelog" section to `README.md` — narrative F00 → F01 → F01.5 →
+  F02 → F02.5 timeline.
+- [ ] T087 Add "Graphify Setup" subsection to README explaining `pipx install graphifyy` and
+  `npm run graphify:build`; reference the committed `graphify-out/GRAPH_REPORT.md`.
+
+### Final Phase 8 verification
+
+- [ ] T088 Push branch; verify all CI jobs green (Lint, Test (20), Test (22), Build, CodeQL).
+- [ ] T089 Update `memory/f015_session_handoff.md` with Phase 8 completion summary; flip PR #10
+  state to ready-to-merge.

@@ -113,6 +113,24 @@ describe('writeChunkNodes', () => {
     const chunks = [{ id: 'c1', text: 'some text' }];
     await expect(writeChunkNodes('sess-1', chunks)).resolves.toBeUndefined();
   });
+
+  it('creates a PART_OF edge linking each chunk to the session anchor when one exists', async () => {
+    // The prior "silently degrades" test leaves mockDb.run as a throwing fn.
+    // clearAllMocks() only resets call history — we must explicitly restore run.
+    mockDb.run.mockReset();
+    // The session anchor lookup (all()) returns a node with a known id
+    mockDb.all.mockReturnValueOnce([{ id: 'anchor-node-id' }]);
+    const chunks = [{ id: 'c1', text: 'first' }, { id: 'c2', text: 'second' }];
+    await writeChunkNodes('sess-1', chunks);
+    // insert is called: 2 chunk nodes + 2 PART_OF edges = 4 total
+    expect(mockDb.insert).toHaveBeenCalledTimes(4);
+    const allValuesCalls = mockDb.values.mock.calls.map((c: unknown[][]) => c[0]);
+    const edgeCalls = allValuesCalls.filter(
+      (v: Record<string, unknown>) => v.relationship === 'PART_OF'
+    );
+    expect(edgeCalls).toHaveLength(2);
+    expect(edgeCalls[0].targetId).toBe('anchor-node-id');
+  });
 });
 
 // ─── queryGraph ──────────────────────────────────────────────────────────────
@@ -192,6 +210,44 @@ describe('rerankWithGraph', () => {
     const candidates = [{ id: 'x' }, { id: 'y' }];
     const result = await rerankWithGraph('sess-1', candidates);
     expect(result).toEqual(candidates);
+  });
+
+  it('reranks candidates by graph edge weight (highest first)', async () => {
+    // First all() — edges; second all() — chunk nodes (with chunkId in properties)
+    mockDb.all
+      .mockReturnValueOnce([
+        { sourceId: 'node-A', weight: 1 },
+        { sourceId: 'node-B', weight: 5 },
+        { sourceId: 'node-B', weight: 2 }, // duplicate increases B's total to 7
+        { sourceId: 'node-C', weight: 3 },
+      ])
+      .mockReturnValueOnce([
+        { id: 'node-A', properties: '{"chunkId":"chunk-A"}' },
+        { id: 'node-B', properties: '{"chunkId":"chunk-B"}' },
+        { id: 'node-C', properties: '{"chunkId":"chunk-C"}' },
+        { id: 'node-D', properties: 'not-json{' }, // malformed — try/catch swallows
+      ]);
+
+    const candidates = [
+      { id: 'chunk-A' },
+      { id: 'chunk-B' },
+      { id: 'chunk-C' },
+    ];
+    const result = await rerankWithGraph('sess-1', candidates);
+    // chunk-B (weight 7) > chunk-C (3) > chunk-A (1)
+    expect(result.map((c) => c.id)).toEqual(['chunk-B', 'chunk-C', 'chunk-A']);
+  });
+
+  it('skips edges whose sourceId has no matching chunk node', async () => {
+    mockDb.all
+      .mockReturnValueOnce([{ sourceId: 'unknown-node', weight: 99 }])
+      .mockReturnValueOnce([
+        { id: 'node-A', properties: '{"chunkId":"chunk-A"}' },
+      ]);
+    const candidates = [{ id: 'chunk-A' }, { id: 'chunk-B' }];
+    const result = await rerankWithGraph('sess-1', candidates);
+    // No matching chunk for the edge → weightMap is empty → original order
+    expect(result.map((c) => c.id)).toEqual(['chunk-A', 'chunk-B']);
   });
 });
 

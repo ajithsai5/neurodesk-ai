@@ -269,3 +269,84 @@ Track F (README)       → depends on Track B/C badge URLs being stable
 ```
 
 All tracks can be worked in parallel except Track E (should start after Track A thresholds are committed, so coverage doesn't regress) and Track F (badge URLs need real CI to be live).
+
+---
+
+## Phase 8 — Gap Closure Plan (added 2026-04-25)
+
+Implements FR-033 through FR-040 from the spec amendment. Four parallel-safe tracks; merge gate
+is a single CI run on this branch.
+
+### Track G — Dependabot zero-open (FR-034, FR-035)
+
+**Strategy**: lowest blast-radius first. Verify already-fixed alerts auto-close after rebase
+(drizzle 0.45.2 ✅ on master, glob ≥ 10.5.0 via override ✅, jsondiffpatch ≥ 0.7.2 via override ✅).
+
+1. **esbuild ≥ 0.25.0** — add `"esbuild": ">=0.25.0"` to the `package.json` `overrides` block.
+   Used transitively by Vite/Vitest; CVE allows malicious websites to read source via dev server.
+   No direct API surface change at this version range; risk: low.
+2. **uuid 14.0.0** — direct bump in `dependencies`. UUID v14 dropped Node 16; we're on 20+.
+   API used by us is `v4()` only — stable across majors. Risk: low.
+3. **next 15.5.15** — major bump from 14.2.35. Breaking changes: async APIs (`headers()`,
+   `cookies()` now return Promise), default fetch caching disabled, App Router behavior tweaks.
+   Audit `src/app/api/**/route.ts` and any Server Component using `headers()`/`cookies()`.
+   Risk: medium — full e2e test must pass post-upgrade.
+4. **ai SDK** — DISMISS alert #3 with rationale per FR-035. Document in handoff for F03.
+
+**Verification**: `gh api repos/ajithsai5/neurodesk-ai/dependabot/alerts --jq '[.[] | select(.state=="open")] | length'` returns 0.
+
+### Track H — 95% coverage push (FR-033)
+
+For each file in the backfill list, identify uncovered branches/lines via `npm test -- --coverage`
+HTML report and add targeted tests. Specific gaps:
+
+- `graph-client.ts` 65.62% → catch-block branches in `getStats()`, write helpers; mock DB error.
+- `graph-service.ts` 88.88% → empty-store paths in `queryCodeEntities`, `cascadeDeleteConversation`.
+- `app/api/chat/route.ts` 72.13% → 401 unauth path, Zod validation failures, conversation-not-found.
+- `GraphPanel.tsx` 71.01% → empty-state render, fetch-error render, hover/click handlers.
+- `ChatPanel.tsx` 78.09% → submit-while-loading guard, error toast branch.
+- `MessageList.tsx` 81.81% → assistant-streaming branch, empty messages array.
+- `MessageInput.tsx` branches 78.57% → 10k-char overflow guard, Enter vs Shift+Enter.
+
+### Track I — Graphify install + integration (FR-036, FR-037, FR-038)
+
+1. **Local install** (developer machine only, not CI): `pipx install graphifyy` documented in
+   README setup section. Add `npm run graphify:build` script that calls `graphify build src/`
+   if `graphify` is on PATH, else logs a skip message. CI does NOT depend on Python.
+2. **Build + commit artifacts**: Run `graphify build src/` from repo root. Commit
+   `graphify-out/graph.json` and `graphify-out/GRAPH_REPORT.md`. Add `graphify-out/cache/` and
+   `graphify-out/transcripts/` to `.gitignore`.
+3. **Claude Code skill**: Run `graphify claude install`. This appends a section to `CLAUDE.md`
+   and adds the PreToolUse hook to `.claude/settings.local.json`. Verify both files updated.
+4. **Chat retrieval enrichment**: New file `src/modules/graph/graphify-bridge.ts` —
+   - `loadGraphifyIndex()`: reads `graphify-out/graph.json`, returns `{ nodes, edges }` or `null`.
+   - `queryGraphifyEntities(query: string, limit = 5)`: substring match on node labels,
+     returns `{ filePath, kind, label }[]`.
+   - Wire into `chat-service.ts` after the existing `queryCodeEntities()` block — append a
+     "## Graphify Knowledge Graph" section to the system prompt with the matches.
+5. **Tests**: Unit test for `graphify-bridge.ts` covering: file-missing graceful degradation,
+   parse-error graceful degradation, happy-path query, empty-result path.
+
+### Track J — Expanded README (FR-039)
+
+Append four new sections (after the existing Contributing section, before License):
+
+1. **Motivation**: Why this project exists — problem statement, target user, alternatives
+   considered (Cursor, Claude Code, ChatGPT Code Interpreter, custom RAG stacks).
+2. **Per-file Index** for `src/`: Table with columns File / Purpose / Public exports.
+   Auto-generate first cut from a one-shot script, then hand-edit purposes.
+3. **Per-function API** for each module's public surface (chat, graph, rag, shared) — function
+   signature + 1-2 sentence purpose.
+4. **Progression Changelog**: Narrative F00 → F01 → F01.5 → F02 → F02.5 timeline showing what
+   was added/changed and the why.
+
+### Delivery order (Phase 8)
+
+```
+Track G (deps)   ─→ run CI → verify coverage holds
+Track H (cov)    ─→ in parallel with G; merge after both pass 95%
+Track I (graphify) → after G+H green
+Track J (README) → in parallel with I, finalised last (links to graphify section)
+```
+
+CI gate (FR-040): one final push on `002.5-platform-hardening`, all jobs green, then merge PR #10.

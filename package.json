@@ -12,7 +12,8 @@
     "test:e2e": "playwright test",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
-    "db:seed": "tsx src/modules/shared/db/seed.ts"
+    "db:seed": "tsx src/modules/shared/db/seed.ts",
+    "graphify:build": "graphify update src"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "1.2.12",
@@ -21,7 +22,7 @@
     "better-sqlite3": "11.10.0",
     "drizzle-orm": "0.45.2",
     "js-tiktoken": "1.0.21",
-    "next": "14.2.35",
+    "next": "15.5.15",
     "pdf-parse": "1.1.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
@@ -30,14 +31,18 @@
     "rehype-highlight": "7.0.2",
     "remark-gfm": "4.0.1",
     "sqlite-vec": "0.1.9",
-    "uuid": "11.1.0",
+    "uuid": "14.0.0",
     "zod": "3.25.76"
   },
   "overrides": {
     "@next/eslint-plugin-next": {
       "glob": ">=10.5.0"
     },
-    "jsondiffpatch": ">=0.7.2"
+    "jsondiffpatch": ">=0.7.2",
+    "esbuild": ">=0.25.0",
+    "next": {
+      "postcss": ">=8.5.10"
+    }
   },
   "devDependencies": {
     "@playwright/test": "~1.59.1",
@@ -55,7 +60,7 @@
     "coverage-badge-creator": "~2.1.0",
     "drizzle-kit": "0.31.10",
     "eslint": "~8.57.1",
-    "eslint-config-next": "~14.2.35",
+    "eslint-config-next": "~15.5.15",
     "jsdom": "~29.0.2",
     "postcss": "~8.5.10",
     "tailwindcss": "~3.4.19",

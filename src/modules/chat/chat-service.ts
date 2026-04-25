@@ -16,6 +16,7 @@ import { applyContextWindow } from './context-window';
 import { config } from '@/lib/config';
 import { logger } from '@/modules/shared/logger';
 import { queryCodeEntities, writeConversationNode } from '@/modules/graph/graph-service';
+import { queryGraphifyEntities } from '@/modules/graph/graphify-bridge';
 import type { ChatRequest, ChatMessage } from './types';
 
 // Handle an incoming chat message: validate, persist, build context, stream LLM response
@@ -84,6 +85,23 @@ export async function handleChatMessage(input: ChatRequest) {
     }
   } catch (err) {
     logger.warn('[ChatService] Graph code-entity enrichment failed (degraded)', { err: String(err) });
+  }
+
+  // Additionally enrich with Graphify-extracted code entities (FR-038).
+  // (Why: Graphify's tree-sitter pass captures the entire `src/` tree statically and exports
+  //  to `graphify-out/graph.json`; we substring-match the user query against it to surface
+  //  files/functions the in-DB graph hasn't indexed yet. Wrapped in try/catch + the bridge
+  //  itself returns [] on any failure so this is best-effort and degrades silently.)
+  try {
+    const graphifyMatches = queryGraphifyEntities(message, 5);
+    if (graphifyMatches.length > 0) {
+      const summary = graphifyMatches
+        .map((m) => `- \`${m.label}\` — ${m.filePath} (${m.location})`)
+        .join('\n');
+      systemPrompt = `${systemPrompt}\n\n## Graphify Knowledge Graph\n${summary}`;
+    }
+  } catch (err) {
+    logger.warn('[ChatService] Graphify enrichment failed (degraded)', { err: String(err) });
   }
 
   // Load provider config to determine which LLM to call

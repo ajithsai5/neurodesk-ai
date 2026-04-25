@@ -70,4 +70,37 @@ describe('PersonaSelector', () => {
     // After personas load, the button should show the selected name
     await waitFor(() => expect(screen.getByText('Tutor')).toBeTruthy());
   });
+
+  // Coverage: highlights the selected persona inside the open dropdown (line 77)
+  it('highlights the currently-selected persona in the open dropdown', async () => {
+    const user = userEvent.setup();
+    render(React.createElement(PersonaSelector, { selectedPersonaId: 'p1', onSelect: vi.fn() }));
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    // Trigger shows "Tutor" once loaded
+    const triggers = await screen.findAllByText('Tutor');
+    await user.click(triggers[0]);
+    // Selected button should have bg-blue-50 class
+    const buttons = document.querySelectorAll('button');
+    const selectedBtn = Array.from(buttons).find(
+      (b) => b.className.includes('bg-blue-50') && b.textContent?.includes('Tutor')
+    );
+    expect(selectedBtn).toBeTruthy();
+  });
+
+  // Coverage: outside click closes the dropdown (lines 44-46)
+  it('closes the dropdown when the user clicks outside', async () => {
+    const user = userEvent.setup();
+    render(
+      React.createElement('div', null,
+        React.createElement(PersonaSelector, { selectedPersonaId: null, onSelect: vi.fn() }),
+        React.createElement('div', { 'data-testid': 'outside' }, 'outside area'),
+      )
+    );
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    await user.click(screen.getByText('Select Persona'));
+    expect(screen.getByText('Tutor')).toBeTruthy();
+    // Click outside — dropdown should close
+    await user.click(screen.getByTestId('outside'));
+    await waitFor(() => expect(screen.queryByText('Tutor')).toBeNull());
+  });
 });

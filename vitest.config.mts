@@ -67,11 +67,13 @@ export default defineConfig({
         'src/app/api/documents/**',
       ],
       thresholds: {
-        // Minimum 90% enforced in CI (FR-001). Aspirational target: 95% (SC-001).
-        statements: 90,
-        branches: 90,
-        functions: 90,
-        lines: 90,
+        // 95% enforced in CI — FR-001 floor 90% raised to SC-001 target 95%
+        // after Phase 8 gap-closure sprint (T075). All four metrics confirmed
+        // above 95% on every run before this threshold was raised.
+        statements: 95,
+        branches: 95,
+        functions: 95,
+        lines: 95,
       },
     },
   },

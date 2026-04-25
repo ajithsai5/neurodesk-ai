@@ -41,3 +41,8 @@ data/documents/
 
 # coverage reports
 /coverage/
+
+# graphify (FR-036): commit graph.json + GRAPH_REPORT.md, exclude regenerated artefacts
+graphify-out/cache/
+graphify-out/transcripts/
+graphify-out/graph.html

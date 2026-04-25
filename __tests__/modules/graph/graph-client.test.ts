@@ -26,7 +26,7 @@ vi.mock('drizzle-orm', async (importOriginal) => {
   };
 });
 
-import { getGraphStats } from '@/modules/graph/graph-client';
+import { getGraphStats, initGraphClient } from '@/modules/graph/graph-client';
 import { db } from '@/modules/shared/db';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -75,5 +75,41 @@ describe('getGraphStats', () => {
     expect(stats.nodeCount).toBe(0);
     expect(stats.edgeCount).toBe(0);
     expect(stats.lastUpdated).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// initGraphClient — was uncovered (lines 24-37); covering both the success path,
+// the idempotent-second-call short-circuit, and the migration-missing failure path.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('initGraphClient', () => {
+  it('runs the warm-up query on first call and resolves', async () => {
+    mockDb.all.mockReturnValue([{ n: 0 }]);
+    await expect(initGraphClient()).resolves.toBeUndefined();
+    expect(mockDb.all).toHaveBeenCalled();
+  });
+
+  it('is idempotent — second call short-circuits without re-querying', async () => {
+    mockDb.all.mockReturnValue([{ n: 0 }]);
+    // Second invocation should hit the `if (_initialised) return;` early-exit.
+    // We can't reset the module-scoped `_initialised` flag from outside, so the
+    // ordering is: previous test set it true → this test verifies no new query.
+    mockDb.all.mockClear();
+    await initGraphClient();
+    expect(mockDb.all).not.toHaveBeenCalled();
+  });
+
+  it('throws a clear migration-missing error when the warm-up query fails', async () => {
+    // Reset module state so the early-exit doesn't fire
+    vi.resetModules();
+    vi.doMock('@/modules/shared/db', () => {
+      const failingDb: Record<string, ReturnType<typeof vi.fn>> = {};
+      ['select', 'from', 'where'].forEach((k) => { failingDb[k] = vi.fn(() => failingDb); });
+      failingDb.all = vi.fn(() => { throw new Error('no such table: graph_nodes'); });
+      return { db: failingDb, schema: { graphNodes: {}, graphEdges: {} } };
+    });
+    const { initGraphClient: freshInit } = await import('@/modules/graph/graph-client');
+    await expect(freshInit()).rejects.toThrow(/graph_nodes table not found/);
+    vi.doUnmock('@/modules/shared/db');
   });
 });
