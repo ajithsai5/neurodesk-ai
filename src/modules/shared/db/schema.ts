@@ -7,7 +7,7 @@
  * (Why: Drizzle provides type-safe schema definitions that map directly to TypeScript types)
  */
 
-import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 // ============================================
@@ -68,6 +68,49 @@ export const personas = sqliteTable('personas', {
   sortOrder: integer('sort_order').notNull().default(0),
 }, (table) => [
   index('idx_persona_sort').on(table.sortOrder),
+]);
+
+// ============================================
+// Graph Store Tables — Knowledge Graph
+// Two tables store the knowledge graph nodes and edges built from
+// conversation messages, RAG document chunks, and code entities.
+// Nodes are session-scoped; edges cascade-delete with their source/target node.
+// ============================================
+
+// Graph nodes table — each node represents a MESSAGE, CHUNK (RAG), or CODE_ENTITY
+// (Why: a flat node table is simpler than a dedicated graph DB while satisfying SC-005 for ≤50 nodes)
+export const graphNodes = sqliteTable('graph_nodes', {
+  id: text('id').primaryKey(),
+  // conversationId is nullable: MESSAGE nodes reference a conversation; CODE_ENTITY nodes do not
+  conversationId: text('conversation_id').references(() => conversations.id, { onDelete: 'cascade' }),
+  sessionId: text('session_id').notNull(),
+  // type distinguishes node categories: MESSAGE (chat turns), CHUNK (RAG docs), CODE_ENTITY (AST symbols)
+  type: text('type', { enum: ['MESSAGE', 'CHUNK', 'CODE_ENTITY'] }).notNull(),
+  label: text('label').notNull(),
+  // properties stores arbitrary JSON metadata (e.g. role, filePath, kind, lineStart, lineEnd)
+  properties: text('properties').notNull().default('{}'),
+  createdAt: integer('created_at').notNull(),
+}, (table) => [
+  index('idx_graph_nodes_conv').on(table.conversationId),
+  index('idx_graph_nodes_session').on(table.sessionId),
+  index('idx_graph_nodes_type').on(table.type),
+]);
+
+// Graph edges table — directed relationships between nodes
+// (Why: edges encode context (FOLLOWS = sequential messages, PART_OF = chunk hierarchy, etc.))
+export const graphEdges = sqliteTable('graph_edges', {
+  id: text('id').primaryKey(),
+  // Both FKs cascade-delete so removing a node automatically cleans up its incident edges
+  sourceId: text('source_id').notNull().references(() => graphNodes.id, { onDelete: 'cascade' }),
+  targetId: text('target_id').notNull().references(() => graphNodes.id, { onDelete: 'cascade' }),
+  relationship: text('relationship', { enum: ['FOLLOWS', 'REFERENCES', 'PART_OF', 'SIMILAR_TO'] }).notNull(),
+  // weight is used for graph-based RAG re-ranking (higher = stronger connection)
+  weight: real('weight').notNull().default(1.0),
+  createdAt: integer('created_at').notNull(),
+}, (table) => [
+  index('idx_graph_edges_source').on(table.sourceId),
+  index('idx_graph_edges_target').on(table.targetId),
+  index('idx_graph_edges_rel').on(table.relationship),
 ]);
 
 // Provider configs table — defines available LLM providers and models

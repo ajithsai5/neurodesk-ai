@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // File: src/app/api/conversations/[id]/archive/route.ts
 /**
  * Archive Toggle API Route Handler

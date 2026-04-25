@@ -1,10 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock the chat module so we never hit the real LLM or database
+// Default: text resolves to '' so the streamData.close() finally-handler runs cleanly.
 vi.mock('@/modules/chat', () => ({
   handleChatMessage: vi.fn(async () => ({
     toDataStreamResponse: vi.fn(() => new Response('stream-data', { status: 200 })),
+    text: Promise.resolve(''),
   })),
+}));
+
+// Mock the RAG module — by default returns no docs so the RAG branch short-circuits
+// (Why: most existing tests don't exercise RAG; we override per-test for the
+//  RAG-context cases.)
+vi.mock('@/modules/rag', () => ({
+  listDocuments: vi.fn(async () => []),
+  retrieveChunks: vi.fn(async () => []),
+  formatRagContext: vi.fn(() => null),
+  formatCitations: vi.fn(() => []),
 }));
 
 // Mock the db module to prevent better-sqlite3 native bindings from loading
@@ -101,6 +113,19 @@ describe('POST /api/chat', () => {
     expect(body.error).toBe('AI service unavailable');
   });
 
+  // T011b — generic unexpected error → 500 "Internal server error" (covers route.ts lines 54-56)
+  it('should return 500 with generic message for unexpected errors', async () => {
+    const { handleChatMessage } = await import('@/modules/chat');
+    (handleChatMessage as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('Database connection failed')
+    );
+    const req = makeRequest({ conversationId: VALID_CONV_ID, message: 'Hi' });
+    const res = await POST(req as any);
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe('Internal server error');
+  });
+
   // T012 — verify handleChatMessage is called with correct arguments
   it('should call handleChatMessage with conversationId and message', async () => {
     const { handleChatMessage } = await import('@/modules/chat');
@@ -110,5 +135,95 @@ describe('POST /api/chat', () => {
       conversationId: VALID_CONV_ID,
       message: 'Hello world',
     });
+  });
+
+  // ───────────────────────────────────────────────────────────────────────
+  // Coverage backfill — the SDK's `messages` array fallback (lines 33-35),
+  // the RAG context + citations branch (lines 51-66), and the streamData
+  // close-after-text path (lines 78-80). These were uncovered when the
+  // route was first written; this block lifts route.ts past 95%.
+  // ───────────────────────────────────────────────────────────────────────
+
+  // The Vercel useChat hook posts { messages: [...] } not { message: '...' }.
+  // Verify the route extracts the last message.content as the user message.
+  it('extracts message from messages[] array (Vercel SDK shape)', async () => {
+    const { handleChatMessage } = await import('@/modules/chat');
+    const req = makeRequest({
+      conversationId: VALID_CONV_ID,
+      messages: [
+        { role: 'user', content: 'first' },
+        { role: 'assistant', content: 'reply' },
+        { role: 'user', content: 'latest message' },
+      ],
+    });
+    const res = await POST(req as any);
+    expect(res.status).toBe(200);
+    expect(handleChatMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: VALID_CONV_ID,
+        message: 'latest message',
+      })
+    );
+  });
+
+  // Covers the `?.content` optional-chain (line 35) returning undefined when
+  // messages[] is present but empty — the schema validation then rejects it with 400.
+  it('returns 400 when messages array is empty (no last message to extract)', async () => {
+    const req = makeRequest({ conversationId: VALID_CONV_ID, messages: [] });
+    const res = await POST(req as any);
+    expect(res.status).toBe(400);
+  });
+
+  it('builds RAG context and attaches citations when ready docs exist', async () => {
+    const { listDocuments, retrieveChunks, formatRagContext, formatCitations } =
+      await import('@/modules/rag');
+    (listDocuments as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { id: 'd1', status: 'ready' },
+    ]);
+    (retrieveChunks as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { id: 'c1', content: 'snippet', score: 0.9 },
+    ]);
+    (formatRagContext as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+      'CONTEXT BLOCK'
+    );
+    (formatCitations as ReturnType<typeof vi.fn>).mockReturnValueOnce([
+      { id: 'c1', source: 'doc.pdf' },
+    ]);
+
+    const { handleChatMessage } = await import('@/modules/chat');
+    const req = makeRequest({ conversationId: VALID_CONV_ID, message: 'query' });
+    const res = await POST(req as any);
+    expect(res.status).toBe(200);
+    // ragContext propagates to chat service
+    expect(handleChatMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ ragContext: 'CONTEXT BLOCK' })
+    );
+    expect(formatCitations).toHaveBeenCalled();
+  });
+
+  it('skips RAG quietly when listDocuments throws (Ollama unreachable)', async () => {
+    const { listDocuments } = await import('@/modules/rag');
+    (listDocuments as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('ECONNREFUSED')
+    );
+    const req = makeRequest({ conversationId: VALID_CONV_ID, message: 'hi' });
+    const res = await POST(req as any);
+    // Chat must still succeed — RAG is best-effort
+    expect(res.status).toBe(200);
+  });
+
+  it('does not build RAG context when no docs are ready', async () => {
+    const { listDocuments, retrieveChunks } = await import('@/modules/rag');
+    (listDocuments as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { id: 'd1', status: 'pending' },
+    ]);
+    const { handleChatMessage } = await import('@/modules/chat');
+    const req = makeRequest({ conversationId: VALID_CONV_ID, message: 'hi' });
+    await POST(req as any);
+    // retrieveChunks should never be called when no doc is ready
+    expect(retrieveChunks).not.toHaveBeenCalled();
+    expect(handleChatMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ ragContext: undefined })
+    );
   });
 });

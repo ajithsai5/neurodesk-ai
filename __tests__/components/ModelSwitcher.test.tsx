@@ -80,4 +80,47 @@ describe('ModelSwitcher', () => {
     render(React.createElement(ModelSwitcher, { selectedProviderId: 'pr1', onSelect: vi.fn() }));
     await waitFor(() => expect(screen.getByText('GPT-4o')).toBeTruthy());
   });
+
+  // Coverage: highlights the currently-selected provider in the dropdown list (line 88)
+  it('highlights the currently-selected provider in the open dropdown', async () => {
+    const user = userEvent.setup();
+    render(React.createElement(ModelSwitcher, { selectedProviderId: 'pr1', onSelect: vi.fn() }));
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    // Open dropdown — the trigger label is now 'GPT-4o', not 'Select Model'
+    const triggers = await screen.findAllByText('GPT-4o');
+    await user.click(triggers[0]);
+    // Both items render; the selected one carries the bg-blue-50 class
+    const items = screen.getAllByText('GPT-4o');
+    expect(items.some((el) => el.closest('button')?.className.includes('bg-blue-50'))).toBe(true);
+  });
+
+  // Coverage: outside-click closes the dropdown (lines 47-49)
+  it('closes the dropdown when the user clicks outside', async () => {
+    const user = userEvent.setup();
+    render(
+      React.createElement('div', null,
+        React.createElement(ModelSwitcher, { selectedProviderId: null, onSelect: vi.fn() }),
+        React.createElement('div', { 'data-testid': 'outside' }, 'outside'),
+      )
+    );
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    await user.click(screen.getByText('Select Model'));
+    expect(screen.getByText('GPT-4o')).toBeTruthy();
+    // Clicking truly outside the dropdown should close it
+    await user.click(screen.getByTestId('outside'));
+    await waitFor(() => expect(screen.queryByText('GPT-4o')).toBeNull());
+  });
+
+  // Coverage: clicking inside the dropdown does NOT close it (the contains-branch of click-outside)
+  it('clicking inside the dropdown leaves it open', async () => {
+    const user = userEvent.setup();
+    render(React.createElement(ModelSwitcher, { selectedProviderId: null, onSelect: vi.fn() }));
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    await user.click(screen.getByText('Select Model'));
+    // The trigger button is inside dropdownRef — clicking the SAME button toggles, not closes via outside-click
+    // Click the unavailable item which doesn't trigger onSelect → dropdown still open
+    await user.click(screen.getByText('Claude 3'));
+    // Dropdown remains open since the click was inside the ref
+    expect(screen.getByText('GPT-4o')).toBeTruthy();
+  });
 });

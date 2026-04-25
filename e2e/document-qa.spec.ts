@@ -11,7 +11,7 @@
  * Requires: dev server on :3000 + Ollama on :11434 with nomic-embed-text + llama3.1:8b
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import path from 'path';
 
 // All tests in this file share state (uploaded document persists in the test DB)
@@ -22,7 +22,7 @@ test.describe('Document Q&A', () => {
   test.setTimeout(180_000);
 
   /** Helper — expand the Documents panel and upload the test fixture */
-  async function uploadTestDocument(page: Parameters<Parameters<typeof test>[1]>[0]) {
+  async function uploadTestDocument(page: Page) {
     // The sidebar Documents toggle button contains "Documents" and an arrow span.
     // Use .filter({ hasText: /Documents/ }) to match regardless of ▼/▲ state.
     const docsToggle = page.locator('aside button').filter({ hasText: /^Documents/ });
@@ -37,7 +37,7 @@ test.describe('Document Q&A', () => {
   }
 
   /** Helper — wait for the document to finish ingestion (Ready) or detect it was deduped */
-  async function waitForDocumentReady(page: Parameters<Parameters<typeof test>[1]>[0]) {
+  async function waitForDocumentReady(page: Page) {
     // The DocumentStatus badge uses label '✓ Ready'; match with regex to avoid unicode issues
     // Also accept 'Already in library' (409 duplicate) — document is already ready in that case
     await expect(

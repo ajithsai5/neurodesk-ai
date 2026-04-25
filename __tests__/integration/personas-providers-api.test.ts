@@ -51,7 +51,8 @@ describe('GET /api/personas', () => {
     const { db } = await import('@/modules/shared/db');
     await personasGET();
     expect(db.select).toHaveBeenCalled();
-    expect(db.orderBy).toHaveBeenCalled();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((db as any).orderBy).toHaveBeenCalled();
   });
 });
 

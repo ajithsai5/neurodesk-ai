@@ -4,6 +4,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MessageInput } from '@/components/chat/MessageInput';
+import { config } from '@/lib/config';
+import { fireEvent } from '@testing-library/react';
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -81,5 +83,42 @@ describe('MessageInput', () => {
     await user.click(btn);
 
     expect(onSubmit).toHaveBeenCalledWith('Hello via button');
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // Coverage backfill — over-limit branch (lines 113-117),
+  // canSubmit=false form-submit guard (line 41), and keydown guard.
+  // ─────────────────────────────────────────────────────────────────
+
+  it('does not call onSubmit when form submits with empty input (canSubmit=false guard)', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(React.createElement(MessageInput, { onSubmit, isLoading: false }));
+    // Submit button is disabled when empty — submit the form via JS to bypass the disabled attr
+    const form = document.querySelector('form')!;
+    fireEvent.submit(form);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('shows the over-limit error and disables submit when value exceeds maxMessageLength', () => {
+    const onSubmit = vi.fn();
+    render(React.createElement(MessageInput, { onSubmit, isLoading: false }));
+    const textarea = screen.getByPlaceholderText('Type a message...') as HTMLTextAreaElement;
+
+    // fireEvent.change is much faster than user.type for 10k+ characters.
+    fireEvent.change(textarea, { target: { value: 'x'.repeat(config.maxMessageLength + 1) } });
+
+    // Inline error renders
+    expect(
+      screen.getByText(
+        new RegExp(`exceeds ${config.maxMessageLength.toLocaleString()} character limit`, 'i')
+      )
+    ).toBeTruthy();
+    // Send button is disabled
+    expect((screen.getByText('Send') as HTMLButtonElement).disabled).toBe(true);
+
+    // Pressing Enter must not submit when over the limit
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });

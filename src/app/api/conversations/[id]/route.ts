@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // File: src/app/api/conversations/[id]/route.ts
 /**
  * Single Conversation API Route Handler
@@ -13,6 +15,7 @@ import { db } from '@/modules/shared/db';
 import { conversations, messages } from '@/modules/shared/db/schema';
 import { updateConversationSchema } from '@/modules/shared/validation';
 import { logger } from '@/modules/shared/logger';
+import { cascadeDeleteConversation } from '@/modules/graph/graph-service';
 
 // Next.js 14 dynamic route params are async — wrapped in Promise
 interface RouteParams {
@@ -100,6 +103,10 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
 
   // Delete conversation — messages are cascade-deleted by the FK constraint in schema
   db.delete(conversations).where(eq(conversations.id, id)).run();
+
+  // Remove graph nodes for this conversation (edges cascade via FK ON DELETE CASCADE).
+  // Wrapped in try/catch — graph write failure must never disrupt conversation deletion.
+  await cascadeDeleteConversation(id);
 
   logger.info('Conversation deleted', { conversationId: id });
 
