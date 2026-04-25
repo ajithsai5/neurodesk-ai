@@ -22,7 +22,7 @@
     "better-sqlite3": "11.10.0",
     "drizzle-orm": "0.45.2",
     "js-tiktoken": "1.0.21",
-    "next": "15.5.15",
+    "next": "16.2.4",
     "pdf-parse": "1.1.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
