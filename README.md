@@ -1,8 +1,8 @@
 # NeuroDesk AI
 
 [![CI](https://github.com/ajithsai5/neurodesk-ai/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/ajithsai5/neurodesk-ai/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/Coverage-91%25-83A603.svg)](https://github.com/ajithsai5/neurodesk-ai/actions)
-[![CodeQL](https://github.com/ajithsai5/neurodesk-ai/security/code-scanning/badge.svg)](https://github.com/ajithsai5/neurodesk-ai/security/code-scanning)
+[![Coverage](https://img.shields.io/badge/Coverage-95%25-brightgreen.svg)](https://github.com/ajithsai5/neurodesk-ai/actions)
+[![CodeQL](https://github.com/ajithsai5/neurodesk-ai/actions/workflows/codeql.yml/badge.svg?branch=master)](https://github.com/ajithsai5/neurodesk-ai/actions/workflows/codeql.yml)
 [![Node](https://img.shields.io/badge/Node-20%20%7C%2022-339933?logo=nodedotjs)](package.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Last Commit](https://img.shields.io/github/last-commit/ajithsai5/neurodesk-ai)](https://github.com/ajithsai5/neurodesk-ai/commits/master)
@@ -22,9 +22,10 @@ Built with **Next.js 14 App Router**, **TypeScript strict mode**, **Drizzle ORM 
 | Feature | Name | Description | Status |
 |---------|------|-------------|--------|
 | F01 | Chat | Multi-conversation chat with persona switching and context window management | ✅ Done |
-| F01.5 | Platform Hardening | 90%+ test coverage, CI matrix, CodeQL, Dependabot, knowledge graph module | ✅ Done |
-| F02 | Document Q&A (RAG) | Upload documents, semantic search, inline citations | 📋 Planned |
-| F03 | Graph-Enhanced RAG | Session graph with code entity indexing and graph-based retrieval re-ranking | 🔄 In Progress |
+| F01.5 | Platform Hardening | 95%+ test coverage, CI matrix, CodeQL, Dependabot zero, Graphify integration | ✅ Done |
+| F02 | Document Q&A (RAG) | Upload documents, semantic search, inline citations | ✅ Done |
+| F02.5 | Platform Hardening II | Graph module, 95% coverage floor, Dependabot zero, CodeQL green | ✅ Done |
+| F03 | Graph-Enhanced RAG | Session graph with code entity indexing and graph-based retrieval re-ranking | 🔄 Next |
 | F04 | Memory | Persistent session memory across conversations | 📋 Planned |
 | F05 | Code Analysis | IDE-style file browsing with AST-powered symbol navigation | 📋 Planned |
 | F06 | Agents | Tool-use agents for file operations, web search, shell commands | 📋 Planned |
