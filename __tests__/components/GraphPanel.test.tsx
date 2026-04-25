@@ -19,7 +19,8 @@ vi.mock('react-force-graph-2d', () => ({
 }));
 
 // Dynamic import so tests that run before the file exists still compile.
-let GraphPanel: React.ComponentType;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let GraphPanel: React.ComponentType<any>;
 
 beforeEach(async () => {
   try {
