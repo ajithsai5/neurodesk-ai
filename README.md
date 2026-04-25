@@ -13,7 +13,7 @@
 
 NeuroDesk AI is a full-stack AI development assistant that combines **conversational chat**, **document question-answering (RAG)**, and an **in-memory knowledge graph** into a single local-first application. It runs entirely on your machine against Ollama or any cloud LLM provider — no data leaves your network unless you choose a cloud API.
 
-Built with **Next.js 14 App Router**, **TypeScript strict mode**, **Drizzle ORM + SQLite**, and the **Vercel AI SDK**.
+Built with **Next.js 15 App Router**, **TypeScript strict mode**, **Drizzle ORM + SQLite**, and the **Vercel AI SDK**.
 
 ---
 
@@ -475,7 +475,7 @@ Spun up Next.js 14 App Router + TypeScript strict + Tailwind + ESLint. Wired Vit
 
 **Milestone**: end-to-end chat round-trip, Ollama → SSE → DOM, in <300 ms first token on `llama3.1:8b`.
 
-### F01.5 — Platform hardening (this branch)
+### F01.5 — Platform hardening ✅ merged
 
 - Vitest coverage with V8 reporter, ≥ 90% gate enforced in CI on every PR.
 - CI matrix: Node 20 + 22 jobs (lint, test, build, CodeQL).
@@ -502,20 +502,25 @@ Spun up Next.js 14 App Router + TypeScript strict + Tailwind + ESLint. Wired Vit
 
 **Milestone**: upload a PDF, ask a question, get a grounded answer with page-level citations.
 
-### F02.5 — Gap closure (this commit)
+### F02.5 — Gap closure ✅ merged (PR #10)
 
-The first F01.5 → master attempt left four gaps the user surfaced post-merge. Phase 8 of the spec closes them:
+Four gaps surfaced after F01.5 merged were closed here:
 
-- **Coverage 90% → 95%** (FR-033): backfilled tests for `graph-client`, `graph-service`, `chat/route`, `GraphPanel`, `ChatPanel`, `MessageList`, `MessageInput`. Threshold bumped in `vitest.config.mts`.
-- **Dependabot 11 → 0 open** (FR-034): `esbuild` ≥ 0.25.0 and `postcss` ≥ 8.5.10 via npm `overrides`; `uuid` 11 → 14; `next` 14.2.35 → 15.5.15; `ai` SDK alert dismissed with rationale (v4 → v5 is a major API break, deferred to F03 — see FR-035).
-- **Graphify actually installed** (FR-036/037/038): `pip install graphifyy`; `graphify update src` → 111 nodes, 110 edges, 35 communities; `graphify claude install` wires the PreToolUse hook into `.claude/settings.json` and a directive section into `CLAUDE.md`; new `graphify-bridge.ts` reads `graphify-out/graph.json` and the chat service appends a "Graphify Knowledge Graph" section to the system prompt with file/function matches.
-- **Expanded README** (FR-039): you're reading it.
+- **Coverage 90% → 95%**: backfilled tests for `graph-client`, `graph-service`, `chat/route`, `GraphPanel`, `ChatPanel`, `MessageList`, `MessageInput`. 274 tests passing. Threshold raised in `vitest.config.mts`.
+- **Dependabot zero**: `esbuild` ≥ 0.25.0 and `postcss` ≥ 8.5.10 via npm `overrides`; `uuid` 11 → 14; `next` 14 → 15.5.15; 19 Dependabot PRs triaged (5 merged, 14 closed with rationale).
+- **Graphify integrated**: `pip install graphifyy`; `graphify update src` → 111 nodes, 110 edges, 35 communities; `graphify claude install` wires PreToolUse hook + CLAUDE.md directive; `graphify-bridge.ts` enriches every chat system prompt with matched code entities from the static graph.
+- **README expanded**: per-file index, per-function API reference, progression changelog, Graphify setup guide.
 
-**Milestone**: PR #10 ready to merge with 95% coverage, zero open Dependabot alerts, real Graphify dev-tool + chat integration, and a README a stranger could ramp up from.
+**Milestone**: merged to master, CI green on Node 20 + 22, 95.43% branch coverage, zero open Dependabot alerts, CodeQL clean.
 
-### F03 — Graph-enhanced RAG (next, on `master`)
+### F03 — Graph-enhanced RAG 🔄 next
 
-Graphify hooks land in production: `writeChunkNodes` is already wired in `graph-service.ts`; `rerankWithGraph` is implemented but the eval set for SC-008 (10% answer-relevance lift) is being baselined now. F03 also picks up the `ai` SDK v4 → v5 migration deferred from F02.5.
+Connect the graph layer to the RAG retrieval path end-to-end:
+
+- `writeChunkNodes()` — log retrieved chunks as `CHUNK` nodes after each RAG query (already implemented, needs to be called in retrieval path).
+- `rerankWithGraph()` — reorder candidates by graph edge-weight score before injecting into the LLM prompt (implemented, needs wiring).
+- Eval harness: baseline answer-relevance score vs. graph-reranked score to confirm SC-008 (≥10% lift).
+- Dependency upgrades deferred from F02.5: `drizzle-orm`, `vitest/coverage-v8`, `pdf-parse`, `@types/node`, `react-dom`, `eslint` — all to be validated against the feature branch before landing on master.
 
 ---
 
