@@ -81,7 +81,14 @@ export async function writeConversationNode(
  */
 export async function writeChunkNodes(
   sessionId: string,
-  chunks: { id: string; text: string }[]
+  chunks: {
+    id: string;
+    text: string;
+    documentId?: string;
+    pageNumber?: number;
+    similarityScore?: number;
+    retrievedAt?: number;
+  }[]
 ): Promise<void> {
   if (chunks.length === 0) return;
 
@@ -110,7 +117,13 @@ export async function writeChunkNodes(
         sessionId,
         type: 'CHUNK',
         label: chunk.text.slice(0, 200), // truncate label for storage efficiency
-        properties: JSON.stringify({ chunkId: chunk.id }),
+        properties: JSON.stringify({
+          chunkId: chunk.id,
+          ...(chunk.documentId !== undefined && { documentId: chunk.documentId }),
+          ...(chunk.pageNumber !== undefined && { pageNumber: chunk.pageNumber }),
+          ...(chunk.similarityScore !== undefined && { similarityScore: chunk.similarityScore }),
+          ...(chunk.retrievedAt !== undefined && { retrievedAt: chunk.retrievedAt }),
+        }),
         createdAt: now,
       }).run();
 
@@ -190,7 +203,8 @@ export async function queryGraph(
  */
 export async function queryCodeEntities(
   _sessionId: string,
-  query: string
+  query: string,
+  limit = 10
 ): Promise<{ id: string; label: string; properties: string }[]> {
   try {
     const pattern = `%${query}%`;
@@ -210,7 +224,7 @@ export async function queryCodeEntities(
           )
         )
       )
-      .limit(10)
+      .limit(limit)
       .all();
   } catch (err) {
     logger.warn('[GraphService] queryCodeEntities failed (degraded)', { err: String(err) });
