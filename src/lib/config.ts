@@ -30,4 +30,9 @@ export const config = {
   // Tiktoken encoding used for token counting (cl100k_base = GPT-4o encoding)
   // (Why: must match the encoding used by target LLM for accurate token estimates)
   tiktokenEncoding: 'cl100k_base' as const,
+
+  // RAG graph-enhanced retrieval: widen candidate pool then rerank, inject top-N
+  // (Why: wider pool gives graph reranking more to work with; final context stays small)
+  ragCandidatePoolSize: 20,
+  ragFinalContextSize: 5,
 } as const;

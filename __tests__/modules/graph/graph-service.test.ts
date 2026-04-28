@@ -114,6 +114,35 @@ describe('writeChunkNodes', () => {
     await expect(writeChunkNodes('sess-1', chunks)).resolves.toBeUndefined();
   });
 
+  it('stores rich metadata in node properties when provided', async () => {
+    mockDb.run.mockReset();
+    const chunks = [{
+      id: 'chunk-1',
+      text: 'Some chunk text',
+      documentId: 'doc-abc',
+      pageNumber: 3,
+      similarityScore: 0.87,
+      retrievedAt: 1700000000000,
+    }];
+    await writeChunkNodes('sess-1', chunks);
+    const allValuesCalls = mockDb.values.mock.calls.map((c: unknown[][]) => c[0]);
+    const chunkNode = allValuesCalls.find(
+      (v: Record<string, unknown>) => v.type === 'CHUNK'
+    );
+    expect(chunkNode).toBeDefined();
+    const props = JSON.parse(chunkNode.properties as string) as Record<string, unknown>;
+    expect(props.documentId).toBe('doc-abc');
+    expect(props.pageNumber).toBe(3);
+    expect(props.similarityScore).toBeCloseTo(0.87);
+    expect(props.retrievedAt).toBe(1700000000000);
+  });
+
+  it('still works when only id and text are provided (backward compat)', async () => {
+    mockDb.run.mockReset();
+    const chunks = [{ id: 'chunk-x', text: 'plain chunk' }];
+    await expect(writeChunkNodes('sess-1', chunks)).resolves.toBeUndefined();
+  });
+
   it('creates a PART_OF edge linking each chunk to the session anchor when one exists', async () => {
     // The prior "silently degrades" test leaves mockDb.run as a throwing fn.
     // clearAllMocks() only resets call history — we must explicitly restore run.
@@ -187,6 +216,21 @@ describe('queryCodeEntities', () => {
     mockDb.all.mockImplementationOnce(() => { throw new Error('DB error'); });
     const result = await queryCodeEntities('sess-1', 'anything');
     expect(result).toEqual([]);
+  });
+
+  it('uses default limit of 10 when no limit arg is passed', async () => {
+    mockDb.all.mockReturnValue([]);
+    await queryCodeEntities('sess-1', 'fn');
+    // The last .limit() call before .all() should be 10
+    const limitCalls = mockDb.limit.mock.calls;
+    expect(limitCalls[limitCalls.length - 1][0]).toBe(10);
+  });
+
+  it('uses custom limit when third arg is provided', async () => {
+    mockDb.all.mockReturnValue([]);
+    await queryCodeEntities('sess-1', 'fn', 20);
+    const limitCalls = mockDb.limit.mock.calls;
+    expect(limitCalls[limitCalls.length - 1][0]).toBe(20);
   });
 });
 

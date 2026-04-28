@@ -63,8 +63,22 @@ vi.mock('@/modules/rag/embedding-client', () => ({
   EmbeddingError: class EmbeddingError extends Error {},
 }));
 
-import { retrieveChunks, formatRagContext, formatCitations } from '@/modules/rag/retrieval-service';
+import { retrieveChunks, formatRagContext, formatCitations, retrieveAndRerank } from '@/modules/rag/retrieval-service';
 import type { RetrievedChunk } from '@/modules/rag/retrieval-service';
+import { config } from '@/lib/config';
+
+// ---------------------------------------------------------------------------
+// Mocks for graph-service (used by retrieveAndRerank)
+// ---------------------------------------------------------------------------
+
+vi.mock('@/modules/graph/graph-service', () => ({
+  writeChunkNodes: vi.fn().mockResolvedValue(undefined),
+  rerankWithGraph: vi.fn().mockImplementation((_sessionId: string, candidates: unknown[]) =>
+    Promise.resolve(candidates)
+  ),
+}));
+
+import { writeChunkNodes, rerankWithGraph } from '@/modules/graph/graph-service';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -233,5 +247,142 @@ describe('retrieveChunks', () => {
     // formatRagContext with no chunks returns null → route converts to undefined → no injection
     const ragContext = formatRagContext([]) ?? undefined;
     expect(ragContext).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatRagContext graphScore — T009
+// ---------------------------------------------------------------------------
+
+describe('formatRagContext graphScore', () => {
+  it('includes Graph Score in source header when graphScore is present', () => {
+    const chunks: RetrievedChunk[] = [
+      { chunkId: 1, content: 'Content.', pageNumber: 3, documentName: 'doc.pdf', distance: 0.1, graphScore: 4 },
+    ];
+    const result = formatRagContext(chunks)!;
+    expect(result).toContain('Source: doc.pdf, Page 3, Graph Score: 4');
+  });
+
+  it('omits Graph Score in source header when graphScore is absent', () => {
+    const chunks: RetrievedChunk[] = [
+      { chunkId: 1, content: 'Content.', pageNumber: 3, documentName: 'doc.pdf', distance: 0.1 },
+    ];
+    const result = formatRagContext(chunks)!;
+    expect(result).toContain('Source: doc.pdf, Page 3');
+    expect(result).not.toContain('Graph Score');
+  });
+
+  it('updates the cite-as instruction to include Graph Score variant', () => {
+    const chunks: RetrievedChunk[] = [
+      { chunkId: 1, content: 'X.', pageNumber: 1, documentName: 'a.pdf', distance: 0.1, graphScore: 2 },
+    ];
+    const result = formatRagContext(chunks)!;
+    expect(result).toMatch(/cite.*DocumentName.*Page/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// retrieveAndRerank — T006: graph-reranked retrieval pipeline
+// ---------------------------------------------------------------------------
+
+describe('retrieveAndRerank', () => {
+  beforeEach(() => {
+    clearTables();
+    vi.clearAllMocks();
+    // Default: rerankWithGraph returns candidates unchanged
+    (rerankWithGraph as ReturnType<typeof vi.fn>).mockImplementation(
+      (_sessionId: string, candidates: unknown[]) => Promise.resolve(candidates)
+    );
+  });
+
+  it('calls retrieveChunks with ragCandidatePoolSize', async () => {
+    // Seed 3 chunks so retrieveChunks can return results
+    seedChunk('a.pdf', 'Chunk A', 1, 0.1);
+    seedChunk('b.pdf', 'Chunk B', 2, 0.2);
+    seedChunk('c.pdf', 'Chunk C', 3, 0.3);
+
+    await retrieveAndRerank('session-1', 'test query');
+
+    // writeChunkNodes should have been called — proof that retrieveChunks was called internally
+    // We verify pool size indirectly: the mock writeChunkNodes receives the retrieved chunks
+    // (the real retrieveChunks is used, seeded with 3 docs and called with ragCandidatePoolSize=20)
+    expect(writeChunkNodes).toHaveBeenCalled();
+    const [, chunksArg] = (writeChunkNodes as ReturnType<typeof vi.fn>).mock.calls[0] as [string, { id: string }[]];
+    // All 3 seeded chunks should be in the pool (pool=20, we only have 3)
+    expect(chunksArg.length).toBe(3);
+  });
+
+  it('calls writeChunkNodes with the retrieved chunks in the correct shape', async () => {
+    seedChunk('doc.pdf', 'Hello world', 5, 0.1);
+
+    await retrieveAndRerank('session-abc', 'query');
+
+    expect(writeChunkNodes).toHaveBeenCalledTimes(1);
+    const [sessionId, chunks] = (writeChunkNodes as ReturnType<typeof vi.fn>).mock.calls[0] as [string, { id: string; text: string; documentId: string; pageNumber: number; similarityScore: number; retrievedAt: number }[]];
+    expect(sessionId).toBe('session-abc');
+    expect(chunks.length).toBe(1);
+    const c = chunks[0]!;
+    expect(typeof c.id).toBe('string');
+    expect(c.text).toBe('Hello world');
+    expect(c.documentId).toBe('doc.pdf');
+    expect(c.pageNumber).toBe(5);
+    expect(typeof c.similarityScore).toBe('number');
+    expect(typeof c.retrievedAt).toBe('number');
+  });
+
+  it('calls rerankWithGraph with sessionId and chunks', async () => {
+    seedChunk('doc.pdf', 'Content', 1, 0.1);
+
+    await retrieveAndRerank('session-xyz', 'query');
+
+    expect(rerankWithGraph).toHaveBeenCalledTimes(1);
+    const [sessionId, candidates] = (rerankWithGraph as ReturnType<typeof vi.fn>).mock.calls[0] as [string, { id: string }[]];
+    expect(sessionId).toBe('session-xyz');
+    expect(candidates.length).toBe(1);
+    expect(typeof candidates[0]!.id).toBe('string');
+  });
+
+  it('returns only ragFinalContextSize chunks when pool is larger', async () => {
+    // Seed more chunks than ragFinalContextSize (5)
+    for (let i = 0; i < 8; i++) {
+      seedChunk('doc.pdf', `Chunk ${i}`, i + 1, i * 0.05);
+    }
+    // Make rerankWithGraph return all 8 candidates so slicing is what limits the result
+    (rerankWithGraph as ReturnType<typeof vi.fn>).mockImplementation(
+      (_sid: string, candidates: unknown[]) => Promise.resolve(candidates)
+    );
+
+    const result = await retrieveAndRerank('session-1', 'query');
+    expect(result.length).toBeLessThanOrEqual(config.ragFinalContextSize);
+  });
+
+  it('returns empty array when retrieveChunks returns empty', async () => {
+    // No seeded chunks → retrieveChunks returns []
+    const result = await retrieveAndRerank('session-1', 'query');
+    expect(result).toEqual([]);
+    expect(writeChunkNodes).not.toHaveBeenCalled();
+    expect(rerankWithGraph).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatCitations graphScore — T007
+// ---------------------------------------------------------------------------
+
+describe('formatCitations graphScore', () => {
+  it('includes graphScore when present on the chunk', () => {
+    const chunks = [
+      { chunkId: 1, content: 'Some text.', pageNumber: 1, documentName: 'doc.pdf', distance: 0.1, graphScore: 0.8 },
+    ] as RetrievedChunk[];
+    const [citation] = formatCitations(chunks);
+    expect(citation!.graphScore).toBe(0.8);
+  });
+
+  it('omits graphScore key when not present on the chunk', () => {
+    const chunks: RetrievedChunk[] = [
+      { chunkId: 1, content: 'Some text.', pageNumber: 1, documentName: 'doc.pdf', distance: 0.1 },
+    ];
+    const [citation] = formatCitations(chunks);
+    expect(citation).not.toHaveProperty('graphScore');
   });
 });

@@ -1,9 +1,9 @@
 // File: src/app/page.tsx
 /**
  * Home Page — Main Application Entry Point
- * Composes the Sidebar and ChatPanel into a two-column layout.
- * Manages the active conversation state and coordinates navigation
- * between conversation list (sidebar) and chat view (main panel).
+ * Composes the Sidebar, ChatPanel, and CodeAssistant into a two-column layout.
+ * The main panel has two top-level modes: Chat (conversation-based) and
+ * Code Assistant (stateless generate + explain).
  * (Why: single page app — all state lives here and flows down as props)
  */
 
@@ -12,10 +12,16 @@
 import { useState, useCallback } from 'react';
 import { Sidebar } from '@/components/sidebar/Sidebar';
 import { ChatPanel } from '@/components/chat/ChatPanel';
+import { CodeAssistant } from '@/components/CodeAssistant';
 
-// Home page component — top-level orchestrator for sidebar + chat layout
-// @returns The full application UI with sidebar navigation and active chat panel
+type MainTab = 'chat' | 'code';
+
+// Home page component — top-level orchestrator for sidebar + main panel
+// @returns The full application UI with sidebar navigation and active panel
 export default function Home() {
+  // Top-level tab: 'chat' or 'code'
+  const [mainTab, setMainTab] = useState<MainTab>('chat');
+
   // Track which conversation is currently displayed in the chat panel
   // (Why: null means no conversation selected — ChatPanel shows empty state)
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -37,6 +43,7 @@ export default function Home() {
       const data = await res.json();
       setActiveConversationId(data.id);
       setRefreshKey((k) => k + 1);
+      setMainTab('chat'); // switch to chat so user sees the new conversation
     }
   }, []);
 
@@ -44,6 +51,7 @@ export default function Home() {
   // (Why: converts empty string to null for consistent "no selection" state)
   const handleSelectConversation = useCallback((id: string) => {
     setActiveConversationId(id || null);
+    setMainTab('chat'); // selecting a conversation switches to Chat mode
   }, []);
 
   return (
@@ -55,11 +63,48 @@ export default function Home() {
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
       />
-      {/* ChatPanel re-mounts when conversation changes to reset chat state */}
-      <ChatPanel
-        key={`chat-${activeConversationId}`}
-        conversationId={activeConversationId}
-      />
+
+      {/* Main panel — tab bar + content area */}
+      <div className="flex flex-col flex-1 min-h-0">
+        {/* Tab bar */}
+        <div className="flex gap-1 border-b border-slate-200 px-4 pt-2 bg-white shrink-0">
+          <button
+            onClick={() => setMainTab('chat')}
+            className={`px-4 py-1.5 text-sm font-medium rounded-t transition-colors ${
+              mainTab === 'chat'
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Chat
+          </button>
+          <button
+            onClick={() => setMainTab('code')}
+            className={`px-4 py-1.5 text-sm font-medium rounded-t transition-colors ${
+              mainTab === 'code'
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Code Assistant
+          </button>
+        </div>
+
+        {/* Panel content */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {mainTab === 'chat' ? (
+            /* ChatPanel re-mounts when conversation changes to reset chat state */
+            <ChatPanel
+              key={`chat-${activeConversationId}`}
+              conversationId={activeConversationId}
+            />
+          ) : (
+            <div className="h-full overflow-y-auto">
+              <CodeAssistant />
+            </div>
+          )}
+        </div>
+      </div>
     </>
   );
 }

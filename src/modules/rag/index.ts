@@ -5,6 +5,7 @@
  * Public API:
  *   ingestDocument(documentId: number): Promise<void>
  *   retrieveChunks(query: string, limit?: number): Promise<RetrievedChunk[]>
+ *   retrieveAndRerank(sessionId: string, query: string): Promise<RetrievedChunk[]>
  *   formatRagContext(chunks: RetrievedChunk[]): string | null
  *   createDocument(buffer, name, mimeType): Promise<CreateDocumentResult | DuplicateDocumentResult>
  *   listDocuments(): Promise<DocumentRecord[]>
@@ -18,7 +19,7 @@
  */
 
 export { ingestDocument, chunkText } from './ingestion-pipeline';
-export { retrieveChunks, formatRagContext, formatCitations } from './retrieval-service';
+export { retrieveChunks, retrieveAndRerank, formatRagContext, formatCitations } from './retrieval-service';
 export type { RetrievedChunk, Citation } from './retrieval-service';
 export {
   createDocument,
