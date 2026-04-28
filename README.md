@@ -25,7 +25,7 @@ Built with **Next.js 15 App Router**, **TypeScript strict mode**, **Drizzle ORM 
 | F01.5 | Platform Hardening | 95%+ test coverage, CI matrix, CodeQL, Dependabot zero, Graphify integration | ✅ Done |
 | F02 | Document Q&A (RAG) | Upload documents, semantic search, inline citations | ✅ Done |
 | F02.5 | Platform Hardening II | Graph module, 95% coverage floor, Dependabot zero, CodeQL green | ✅ Done |
-| F03 | Graph-Enhanced RAG | Session graph with code entity indexing and graph-based retrieval re-ranking | 🔄 Next |
+| F03 | AI Code Assistant + Graph-Enhanced RAG | Code generation & explanation UI; RAG upgraded to top-20 pool with graph reranking → top-5; Citation graph score badge | ✅ Done |
 | F04 | Memory | Persistent session memory across conversations | 📋 Planned |
 | F05 | Code Analysis | IDE-style file browsing with AST-powered symbol navigation | 📋 Planned |
 | F06 | Agents | Tool-use agents for file operations, web search, shell commands | 📋 Planned |

@@ -15,6 +15,7 @@ vi.mock('@/modules/chat', () => ({
 vi.mock('@/modules/rag', () => ({
   listDocuments: vi.fn(async () => []),
   retrieveChunks: vi.fn(async () => []),
+  retrieveAndRerank: vi.fn(async () => []),
   formatRagContext: vi.fn(() => null),
   formatCitations: vi.fn(() => []),
 }));
@@ -175,19 +176,19 @@ describe('POST /api/chat', () => {
   });
 
   it('builds RAG context and attaches citations when ready docs exist', async () => {
-    const { listDocuments, retrieveChunks, formatRagContext, formatCitations } =
+    const { listDocuments, retrieveAndRerank, formatRagContext, formatCitations } =
       await import('@/modules/rag');
     (listDocuments as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
       { id: 'd1', status: 'ready' },
     ]);
-    (retrieveChunks as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
-      { id: 'c1', content: 'snippet', score: 0.9 },
+    (retrieveAndRerank as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { chunkId: 1, content: 'snippet', pageNumber: 1, documentName: 'doc.pdf', distance: 0.1 },
     ]);
     (formatRagContext as ReturnType<typeof vi.fn>).mockReturnValueOnce(
       'CONTEXT BLOCK'
     );
     (formatCitations as ReturnType<typeof vi.fn>).mockReturnValueOnce([
-      { id: 'c1', source: 'doc.pdf' },
+      { documentName: 'doc.pdf', pageNumber: 1, excerpt: 'snippet' },
     ]);
 
     const { handleChatMessage } = await import('@/modules/chat');
@@ -213,15 +214,15 @@ describe('POST /api/chat', () => {
   });
 
   it('does not build RAG context when no docs are ready', async () => {
-    const { listDocuments, retrieveChunks } = await import('@/modules/rag');
+    const { listDocuments, retrieveAndRerank } = await import('@/modules/rag');
     (listDocuments as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
       { id: 'd1', status: 'pending' },
     ]);
     const { handleChatMessage } = await import('@/modules/chat');
     const req = makeRequest({ conversationId: VALID_CONV_ID, message: 'hi' });
     await POST(req as any);
-    // retrieveChunks should never be called when no doc is ready
-    expect(retrieveChunks).not.toHaveBeenCalled();
+    // retrieveAndRerank should never be called when no doc is ready
+    expect(retrieveAndRerank).not.toHaveBeenCalled();
     expect(handleChatMessage).toHaveBeenCalledWith(
       expect.objectContaining({ ragContext: undefined })
     );

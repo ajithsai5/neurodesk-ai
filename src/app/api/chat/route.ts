@@ -12,7 +12,7 @@ import { NextRequest } from 'next/server';
 import { StreamData } from 'ai';
 import { chatInputSchema } from '@/modules/shared/validation';
 import { handleChatMessage } from '@/modules/chat';
-import { listDocuments, retrieveChunks, formatRagContext, formatCitations } from '@/modules/rag';
+import { listDocuments, retrieveAndRerank, formatRagContext, formatCitations } from '@/modules/rag';
 import { logger } from '@/modules/shared/logger';
 
 // Handle incoming chat messages and return a streaming AI response
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       const docs = await listDocuments();
       const hasReady = docs.some((d) => d.status === 'ready');
       if (hasReady) {
-        const chunks = await retrieveChunks(parsed.data.message);
+        const chunks = await retrieveAndRerank(parsed.data.conversationId, parsed.data.message);
         ragContext = formatRagContext(chunks) ?? undefined;
         // Attach citations as a message annotation so the client can render a Sources panel
         // (Why: StreamData annotations travel alongside the SSE stream and are attached to the

@@ -3,11 +3,14 @@
  * Retrieval Service
  * Embeds a user query and performs cosine similarity search against the vec_document_chunks
  * virtual table to return the top-k most relevant document chunks for RAG context injection.
+ * Graph-enhanced retrieval widens the candidate pool then re-ranks by edge weight.
  * (Why: similarity search is the core of retrieval-augmented generation)
  */
 
 import { sqlite } from '@/modules/shared/db';
 import { generateEmbedding } from './embedding-client';
+import { config } from '@/lib/config';
+import { writeChunkNodes, rerankWithGraph } from '@/modules/graph/graph-service';
 
 export interface RetrievedChunk {
   chunkId: number;
@@ -15,6 +18,7 @@ export interface RetrievedChunk {
   pageNumber: number;
   documentName: string; // original_name from documents table
   distance: number;     // cosine distance (lower = more similar)
+  graphScore?: number;  // optional reranking score from graph edge weights
 }
 
 /**
@@ -69,17 +73,60 @@ export async function retrieveChunks(
 }
 
 /**
+ * Graph-enhanced retrieval: retrieve a wider candidate pool, write CHUNK nodes to the
+ * knowledge graph, re-rank candidates by accumulated edge weight, then return the top-N.
+ *
+ * Uses config.ragCandidatePoolSize (20) as the retrieval limit and
+ * config.ragFinalContextSize (5) as the final injection size.
+ * Falls back to an empty array when the pool is empty (no ready documents).
+ * (Why: wider pool gives the graph reranker more signal; final context stays small)
+ *
+ * @param sessionId - Current session identifier passed to graph operations
+ * @param query     - The user's question or search string
+ * @returns Top-N re-ranked chunks ready for LLM context injection
+ */
+export async function retrieveAndRerank(
+  sessionId: string,
+  query: string,
+): Promise<RetrievedChunk[]> {
+  const pool = await retrieveChunks(query, config.ragCandidatePoolSize);
+  if (pool.length === 0) return [];
+
+  // Write CHUNK nodes to the graph so future queries can leverage edge weights
+  await writeChunkNodes(
+    sessionId,
+    pool.map((c) => ({
+      id: String(c.chunkId),
+      text: c.content,
+      documentId: c.documentName,
+      pageNumber: c.pageNumber,
+      similarityScore: 1 - c.distance,  // convert distance → similarity
+      retrievedAt: Date.now(),
+    })),
+  );
+
+  // Re-rank by graph edge weight; candidates without graph edges keep original order
+  const withIds = pool.map((c) => ({ ...c, id: String(c.chunkId) }));
+  const reranked = await rerankWithGraph(sessionId, withIds);
+
+  return reranked.slice(0, config.ragFinalContextSize);
+}
+
+/**
  * A single citation referencing a source page in an uploaded document.
  * Sent as a message annotation so the client can render a Sources panel.
+ * graphScore is optional — only present when graph reranking was active.
  */
 export interface Citation {
   documentName: string;
   pageNumber: number;
   excerpt: string;
+  graphScore?: number;  // graph reranking weight (higher = more connected in knowledge graph)
 }
 
 /**
  * Convert retrieved chunks into Citation objects for the client-side Sources panel.
+ * Preserves graphScore when present on the chunk (set by graph-enhanced retrieval).
  * Returns an empty array when no chunks are available.
  */
 export function formatCitations(chunks: RetrievedChunk[]): Citation[] {
@@ -87,6 +134,7 @@ export function formatCitations(chunks: RetrievedChunk[]): Citation[] {
     documentName: chunk.documentName,
     pageNumber: chunk.pageNumber,
     excerpt: chunk.content,
+    ...(chunk.graphScore !== undefined && { graphScore: chunk.graphScore }),
   }));
 }
 

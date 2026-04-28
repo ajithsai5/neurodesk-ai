@@ -43,10 +43,21 @@ export function CitationPanel({ citations }: Props) {
               key={i}
               className="text-xs border border-slate-200 rounded p-2 bg-slate-50"
             >
-              {/* Citation header: [DocumentName, Page N] */}
-              <p className="font-medium text-slate-700">
-                [{c.documentName}, Page {c.pageNumber}]
-              </p>
+              {/* Citation header: [DocumentName, Page N] + optional graph score badge */}
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-medium text-slate-700">
+                  [{c.documentName}, Page {c.pageNumber}]
+                </p>
+                {c.graphScore !== undefined && (
+                  <span
+                    data-testid="graph-score-badge"
+                    className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-slate-500 font-mono"
+                    title="Graph relevance score"
+                  >
+                    {c.graphScore.toFixed(2)}
+                  </span>
+                )}
+              </div>
               {/* Excerpt — clamped to 3 lines to keep the panel compact */}
               <p className="text-slate-500 mt-1 line-clamp-3">{c.excerpt}</p>
             </li>
