@@ -1,14 +1,14 @@
 // File: __tests__/components/CodeAssistant.test.tsx
 /**
  * Unit tests for CodeAssistant component (T026-T029).
- * Uses MSW-free fetch mocking via vi.stubGlobal so no server setup is needed.
+ * Uses vi.stubGlobal fetch mocking so no server setup is needed.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CodeAssistant } from '@/components/CodeAssistant';
 
-// ─── Fetch mock ───────────────────────────────────────────────────────────────
+// ─── Fetch mock helpers ───────────────────────────────────────────────────────
 
 function mockFetchOnce(body: unknown, status = 200) {
   vi.stubGlobal(
@@ -26,7 +26,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-// ─── Rendering ────────────────────────────────────────────────────────────────
+// ─── Basic rendering ──────────────────────────────────────────────────────────
 
 describe('CodeAssistant', () => {
   it('renders Generate and Explain tab buttons', () => {
@@ -110,7 +110,25 @@ describe('CodeAssistant generate flow', () => {
     fireEvent.click(screen.getByRole('button', { name: /generate code/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/error|failed/i)).toBeDefined();
+      expect(screen.getByText(/request failed/i)).toBeDefined();
+    });
+  });
+
+  it('shows error message when fetch throws (network error)', async () => {
+    vi.unstubAllGlobals();
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValueOnce(new Error('Network error')));
+
+    render(<CodeAssistant />);
+    fireEvent.change(screen.getByPlaceholderText(/language/i), {
+      target: { value: 'ts' },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/description/i), {
+      target: { value: 'anything' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /generate code/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/failed to reach/i)).toBeDefined();
     });
   });
 });
@@ -122,7 +140,7 @@ describe('CodeAssistant explain flow', () => {
     mockFetchOnce({ explanation: 'This adds two numbers.' });
 
     render(<CodeAssistant />);
-    fireEvent.click(screen.getByRole('button', { name: /explain/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Explain' }));
     fireEvent.change(screen.getByPlaceholderText(/paste.*code/i), {
       target: { value: 'const add = (a, b) => a + b;' },
     });
@@ -140,7 +158,7 @@ describe('CodeAssistant explain flow', () => {
     mockFetchOnce({ explanation: 'This adds two numbers.' });
 
     render(<CodeAssistant />);
-    fireEvent.click(screen.getByRole('button', { name: /explain/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Explain' }));
     fireEvent.change(screen.getByPlaceholderText(/paste.*code/i), {
       target: { value: 'const add = (a, b) => a + b;' },
     });
@@ -148,6 +166,36 @@ describe('CodeAssistant explain flow', () => {
 
     await waitFor(() => {
       expect(screen.getByText('This adds two numbers.')).toBeDefined();
+    });
+  });
+
+  it('shows error when explain API returns 500', async () => {
+    mockFetchOnce({ error: 'LLM down' }, 500);
+
+    render(<CodeAssistant />);
+    fireEvent.click(screen.getByRole('button', { name: 'Explain' }));
+    fireEvent.change(screen.getByPlaceholderText(/paste.*code/i), {
+      target: { value: 'const x = 1;' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /explain code/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/request failed/i)).toBeDefined();
+    });
+  });
+
+  it('shows error when explain fetch throws (network error)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValueOnce(new Error('Network error')));
+
+    render(<CodeAssistant />);
+    fireEvent.click(screen.getByRole('button', { name: 'Explain' }));
+    fireEvent.change(screen.getByPlaceholderText(/paste.*code/i), {
+      target: { value: 'const x = 1;' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /explain code/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/failed to reach/i)).toBeDefined();
     });
   });
 });

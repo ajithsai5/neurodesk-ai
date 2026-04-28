@@ -251,6 +251,37 @@ describe('retrieveChunks', () => {
 });
 
 // ---------------------------------------------------------------------------
+// formatRagContext graphScore — T009
+// ---------------------------------------------------------------------------
+
+describe('formatRagContext graphScore', () => {
+  it('includes Graph Score in source header when graphScore is present', () => {
+    const chunks: RetrievedChunk[] = [
+      { chunkId: 1, content: 'Content.', pageNumber: 3, documentName: 'doc.pdf', distance: 0.1, graphScore: 4 },
+    ];
+    const result = formatRagContext(chunks)!;
+    expect(result).toContain('Source: doc.pdf, Page 3, Graph Score: 4');
+  });
+
+  it('omits Graph Score in source header when graphScore is absent', () => {
+    const chunks: RetrievedChunk[] = [
+      { chunkId: 1, content: 'Content.', pageNumber: 3, documentName: 'doc.pdf', distance: 0.1 },
+    ];
+    const result = formatRagContext(chunks)!;
+    expect(result).toContain('Source: doc.pdf, Page 3');
+    expect(result).not.toContain('Graph Score');
+  });
+
+  it('updates the cite-as instruction to include Graph Score variant', () => {
+    const chunks: RetrievedChunk[] = [
+      { chunkId: 1, content: 'X.', pageNumber: 1, documentName: 'a.pdf', distance: 0.1, graphScore: 2 },
+    ];
+    const result = formatRagContext(chunks)!;
+    expect(result).toMatch(/cite.*DocumentName.*Page/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // retrieveAndRerank — T006: graph-reranked retrieval pipeline
 // ---------------------------------------------------------------------------
 

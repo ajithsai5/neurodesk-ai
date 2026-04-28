@@ -68,6 +68,21 @@ beforeEach(() => {
   mockQueryCodeEntities.mockResolvedValue([]);
 });
 
+// Typed reference to the mock db
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockDb = (await import('@/modules/shared/db')).db as any;
+
+// ─── resolveModel — no provider branch ───────────────────────────────────────
+
+describe('resolveModel (no available provider)', () => {
+  it('throws when db.get returns null (no provider configured)', async () => {
+    mockDb.get.mockReturnValueOnce(null);
+    await expect(
+      generateCode({ language: 'typescript', description: 'anything' }),
+    ).rejects.toThrow('No available LLM provider configured');
+  });
+});
+
 // ─── generateCode (T012) ─────────────────────────────────────────────────────
 
 describe('generateCode', () => {
@@ -148,6 +163,36 @@ describe('graph-aware code generation', () => {
         system: expect.stringContaining('MyService'),
       }),
     );
+  });
+
+  it('handles malformed JSON in entity properties without throwing', async () => {
+    mockQueryCodeEntities.mockResolvedValue([
+      { id: 'e1', label: 'badEntity', properties: 'not-valid-json{' },
+    ]);
+    // Should not throw — catch block returns fallback label
+    const result = await generateCode({ language: 'typescript', description: 'test', sessionId: 'sess-1' });
+    expect(result).toBe('generated content');
+    // System prompt should still contain the entity label via fallback
+    const callArgs = mockGenerateText.mock.calls[0][0] as { system: string };
+    expect(callArgs.system).toContain('badEntity');
+  });
+
+  it('uses "symbol" fallback when entity kind is missing', async () => {
+    mockQueryCodeEntities.mockResolvedValue([
+      { id: 'e1', label: 'myFunc', properties: '{"filePath":"src/foo.ts"}' }, // no kind
+    ]);
+    await generateCode({ language: 'typescript', description: 'test', sessionId: 's' });
+    const callArgs = mockGenerateText.mock.calls[0][0] as { system: string };
+    expect(callArgs.system).toContain('symbol `myFunc`');
+  });
+
+  it('uses "unknown" fallback when entity filePath is missing', async () => {
+    mockQueryCodeEntities.mockResolvedValue([
+      { id: 'e1', label: 'myFunc', properties: '{"kind":"function"}' }, // no filePath
+    ]);
+    await generateCode({ language: 'typescript', description: 'test', sessionId: 's' });
+    const callArgs = mockGenerateText.mock.calls[0][0] as { system: string };
+    expect(callArgs.system).toContain('in unknown');
   });
 
   it('proceeds without context when graph returns empty array', async () => {

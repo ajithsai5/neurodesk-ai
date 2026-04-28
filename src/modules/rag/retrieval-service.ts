@@ -145,9 +145,12 @@ export function formatCitations(chunks: RetrievedChunk[]): Citation[] {
 export function formatRagContext(chunks: RetrievedChunk[]): string | null {
   if (chunks.length === 0) return null;
 
-  const sections = chunks.map((chunk) =>
-    `--- Source: ${chunk.documentName}, Page ${chunk.pageNumber} ---\n${chunk.content}`
-  );
+  const sections = chunks.map((chunk) => {
+    const scoreLabel = chunk.graphScore !== undefined
+      ? `, Graph Score: ${chunk.graphScore}`
+      : '';
+    return `--- Source: ${chunk.documentName}, Page ${chunk.pageNumber}${scoreLabel} ---\n${chunk.content}`;
+  });
 
   return [
     '[DOCUMENT CONTEXT]',
