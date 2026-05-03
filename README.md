@@ -40,14 +40,21 @@ Built with **Next.js 15 App Router**, **TypeScript strict mode**, **Drizzle ORM 
 
 ```mermaid
 graph TD
-    subgraph "Browser"
+    subgraph "Browser (Claude Design System)"
+        S[NavSidebar + TopBar shell]
         A[ChatPanel] --> B[useChat hook]
         C[GraphPanel] --> D[fetch /api/graph/query]
+        DQ[DocumentQAPanel] --> DU[DocumentUpload + Library]
+        SP[SettingsPanel]
+        S --> A
+        S --> DQ
+        S --> SP
     end
 
     subgraph "Next.js API Routes"
         E[POST /api/chat]
         F[GET /api/conversations]
+        DOC[POST /api/documents]
         G[GET /api/graph/query]
         H[GET /api/health]
     end
@@ -58,27 +65,42 @@ graph TD
         K[context-window.ts]
     end
 
+    subgraph "RAG Module"
+        R1[ingestion-pipeline.ts]
+        R2[retrieval-service.ts]
+        R3[embedding-client.ts]
+    end
+
     subgraph "Graph Module"
         L[graph-service.ts]
         M[graph-client.ts]
         N[ast-analysis.ts]
+        GB[graphify-bridge.ts]
     end
 
     subgraph "Shared Module"
-        O[(SQLite DB)]
+        O[(SQLite DB + sqlite-vec)]
         P[logger.ts]
         Q[validation.ts]
     end
 
     B --> E
+    DU --> DOC
     E --> I
+    DOC --> R1
+    I --> R2
     I --> J
     I --> K
     I --> L
+    I --> GB
+    R1 --> R3
+    R2 --> L
     G --> L
     H --> M
     L --> O
     M --> O
+    R1 --> O
+    R2 --> O
     I --> O
 ```
 
@@ -241,7 +263,7 @@ Follow this order — do not skip steps:
 ### PR Checklist
 
 - [ ] Tests pass: `npm test`
-- [ ] Coverage ≥ 90%: `npm test -- --coverage`
+- [ ] Coverage ≥ 95%: `npm test -- --coverage`
 - [ ] No new CodeQL findings
 - [ ] Lint clean: `npm run lint`
 - [ ] TypeScript clean: `npx tsc --noEmit`
@@ -284,8 +306,11 @@ Every TypeScript file under `src/`, what it does, and the public symbols it expo
 
 | File | Purpose | Public exports |
 |------|---------|----------------|
-| `app/layout.tsx` | Root HTML layout, font loader, global CSS | `RootLayout` (default) |
-| `app/page.tsx` | Home page — top-level shell that mounts `Sidebar` + `ChatPanel` | `Home` (default) |
+| `app/layout.tsx` | Root HTML layout, font loader, theme provider, global CSS + tokens | `RootLayout` (default) |
+| `app/page.tsx` | Home page — top-level shell that mounts `NavSidebar` + `TopBar` + active panel | `Home` (default) |
+| `app/tokens.css` | Design system tokens — oklch colors, spacing, radii, shadows; light + dark mode | (CSS) |
+| `app/components.css` | Reusable component classes — `.btn`, `.card`, `.badge`, `.input`, `.skeleton`, etc. | (CSS) |
+| `app/globals.css` | Global resets, font setup, animation keyframes | (CSS) |
 
 ### `src/app/api/` — Route handlers (server-only)
 
@@ -520,6 +545,17 @@ Four gaps surfaced after F01.5 merged were closed here:
 
 **Milestone**: merged to master, CI green on Node 20 + 22, 95.43% branch coverage, zero open Dependabot alerts, CodeQL clean.
 
+### F03 — AI Code Assistant + Graph-enhanced RAG ✅ merged
+
+Connected the graph layer to the RAG retrieval path end-to-end and added a dedicated code-assistant surface:
+
+- `writeChunkNodes()` logs retrieved chunks as `CHUNK` nodes after each RAG query, wiring the graph into the live retrieval path.
+- `rerankWithGraph()` reorders candidates by graph edge-weight score before injecting into the LLM prompt — RAG upgraded from top-5 direct retrieval to top-20 candidate pool → graph rerank → top-5.
+- Citation panel adds a graph-score badge so users can see which sources benefited from rerank.
+- Eval harness confirms SC-008 (≥10% answer-relevance lift on the graph-reranked path).
+
+**Milestone**: graph-enhanced RAG live in master; citations show graph score; coverage ≥ 95% maintained.
+
 ### F03.5 — UI Redesign (Claude Design System) ✅ merged
 
 Full visual redesign replacing ad-hoc Tailwind classes with a purpose-built design system:
@@ -535,14 +571,9 @@ Full visual redesign replacing ad-hoc Tailwind classes with a purpose-built desi
 
 **Milestone**: all 95%+ coverage thresholds maintained; zero CI regressions; dark mode confirmed in browser.
 
-### F03 — Graph-enhanced RAG 🔄 next
+### F04 — Memory 🔄 next
 
-Connect the graph layer to the RAG retrieval path end-to-end:
-
-- `writeChunkNodes()` — log retrieved chunks as `CHUNK` nodes after each RAG query (already implemented, needs to be called in retrieval path).
-- `rerankWithGraph()` — reorder candidates by graph edge-weight score before injecting into the LLM prompt (implemented, needs wiring).
-- Eval harness: baseline answer-relevance score vs. graph-reranked score to confirm SC-008 (≥10% lift).
-- Dependency upgrades deferred from F02.5: `drizzle-orm`, `vitest/coverage-v8`, `pdf-parse`, `@types/node`, `react-dom`, `eslint` — all to be validated against the feature branch before landing on master.
+Persistent session memory across conversations: long-term entity & preference store, retrieved as context on each new conversation start. Schema design and retrieval heuristics are next.
 
 ---
 
