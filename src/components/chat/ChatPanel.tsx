@@ -125,19 +125,25 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
   // Show welcome screen when no conversation is selected
   if (!conversationId) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-slate-50 text-slate-400">
-        <div className="text-center">
-          <p className="text-xl font-medium">NeuroDesk AI</p>
-          <p className="text-sm mt-2">Select a conversation or start a new one</p>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-canvas)' }}>
+        <div className="empty-state">
+          <p className="empty-state__title">NeuroDesk AI</p>
+          <p className="empty-state__body">Select a conversation or start a new one</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-50">
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-canvas)', minHeight: 0 }}>
       {/* Toolbar: Persona selector (left) + Model switcher (right) */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-white">
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: 'var(--space-3) var(--space-5)',
+        borderBottom: '1px solid var(--border-subtle)',
+        background: 'var(--bg-surface)',
+        flexShrink: 0,
+      }}>
         <PersonaSelector selectedPersonaId={personaId} onSelect={handlePersonaChange} />
         <ModelSwitcher selectedProviderId={providerId} onSelect={handleProviderChange} />
       </div>
@@ -147,13 +153,20 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
 
       {/* Error banner with retry button — shown when streaming fails */}
       {error && (
-        <div className="px-4 py-2 bg-red-50 border-t border-red-200 flex items-center justify-between">
-          <p className="text-red-600 text-sm">
+        <div style={{
+          padding: 'var(--space-3) var(--space-5)',
+          background: 'var(--color-danger-bg)',
+          borderTop: '1px solid var(--color-danger-border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexShrink: 0,
+        }}>
+          <p style={{ color: 'var(--color-danger-text)', fontSize: 'var(--text-sm)', margin: 0 }}>
             {error.message || 'An error occurred. Please try again.'}
           </p>
           <button
             onClick={() => reload()}
-            className="text-red-600 text-sm font-medium hover:underline"
+            className="btn btn--ghost btn--sm"
+            style={{ color: 'var(--color-danger-text)' }}
           >
             Retry
           </button>

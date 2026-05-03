@@ -53,19 +53,32 @@ export function PersonaSelector({ selectedPersonaId, onSelect }: PersonaSelector
   const selected = personas.find((p) => p.id === selectedPersonaId);
 
   return (
-    <div ref={dropdownRef} className="relative">
+    <div ref={dropdownRef} style={{ position: 'relative' }}>
       {/* Trigger button showing current persona name */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-slate-300 hover:bg-slate-50 transition-colors"
+        className="btn btn--ghost btn--sm"
+        style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
       >
         <span>{selected?.name ?? 'Select Persona'}</span>
-        <span className="text-xs text-slate-400">&#9662;</span>
+        <span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>
       </button>
 
       {/* Dropdown menu listing all personas with name and description */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[220px]">
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          marginTop: 'var(--space-1)',
+          zIndex: 20,
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-lg)',
+          padding: 'var(--space-1) 0',
+          minWidth: 220,
+        }}>
           {personas.map((persona) => (
             <button
               key={persona.id}
@@ -73,12 +86,30 @@ export function PersonaSelector({ selectedPersonaId, onSelect }: PersonaSelector
                 onSelect(persona.id);
                 setIsOpen(false);
               }}
-              className={`w-full text-left px-3 py-2 hover:bg-slate-50 ${
-                persona.id === selectedPersonaId ? 'bg-blue-50 text-blue-700' : ''
-              }`}
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: 'var(--space-2) var(--space-4)',
+                background: persona.id === selectedPersonaId ? 'var(--color-accent-50)' : 'transparent',
+                color: persona.id === selectedPersonaId ? 'var(--color-accent-700)' : 'var(--fg-primary)',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'block',
+              }}
+              data-selected={persona.id === selectedPersonaId ? 'true' : undefined}
+              onMouseEnter={(e) => {
+                if (persona.id !== selectedPersonaId) {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-subtle)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (persona.id !== selectedPersonaId) {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                }
+              }}
             >
-              <p className="text-sm font-medium">{persona.name}</p>
-              <p className="text-xs text-slate-500">{persona.description}</p>
+              <p style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)' }}>{persona.name}</p>
+              <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--fg-muted)', marginTop: 2 }}>{persona.description}</p>
             </button>
           ))}
         </div>

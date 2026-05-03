@@ -79,10 +79,10 @@ describe('PersonaSelector', () => {
     // Trigger shows "Tutor" once loaded
     const triggers = await screen.findAllByText('Tutor');
     await user.click(triggers[0]);
-    // Selected button should have bg-blue-50 class
+    // Selected button should have data-selected attribute
     const buttons = document.querySelectorAll('button');
     const selectedBtn = Array.from(buttons).find(
-      (b) => b.className.includes('bg-blue-50') && b.textContent?.includes('Tutor')
+      (b) => b.getAttribute('data-selected') === 'true' && b.textContent?.includes('Tutor')
     );
     expect(selectedBtn).toBeTruthy();
   });

@@ -89,9 +89,9 @@ describe('ModelSwitcher', () => {
     // Open dropdown — the trigger label is now 'GPT-4o', not 'Select Model'
     const triggers = await screen.findAllByText('GPT-4o');
     await user.click(triggers[0]);
-    // Both items render; the selected one carries the bg-blue-50 class
+    // Both items render; the selected one carries data-selected="true"
     const items = screen.getAllByText('GPT-4o');
-    expect(items.some((el) => el.closest('button')?.className.includes('bg-blue-50'))).toBe(true);
+    expect(items.some((el) => el.closest('button')?.getAttribute('data-selected') === 'true')).toBe(true);
   });
 
   // Coverage: outside-click closes the dropdown (lines 47-49)

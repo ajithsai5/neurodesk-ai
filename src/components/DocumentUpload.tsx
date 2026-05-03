@@ -65,25 +65,24 @@ export function DocumentUpload({ onUploaded }: Props) {
   }
 
   return (
-    <div className="px-3 pb-2">
+    <div>
       <input
         ref={inputRef}
         type="file"
         accept=".pdf,.txt"
-        className="hidden"
+        style={{ display: 'none' }}
         onChange={handleChange}
         disabled={uploading}
       />
       <button
         onClick={() => inputRef.current?.click()}
         disabled={uploading}
-        className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm
-                   bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400
-                   text-white rounded-lg transition-colors"
+        className="btn btn--primary"
+        style={{ width: '100%', justifyContent: 'center', gap: 'var(--space-2)' }}
       >
         {uploading ? (
           <>
-            <span className="animate-spin">⟳</span>
+            <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</span>
             Uploading…
           </>
         ) : (
@@ -94,7 +93,15 @@ export function DocumentUpload({ onUploaded }: Props) {
         )}
       </button>
       {error && (
-        <p className="mt-1 text-xs text-red-600 text-center">{error}</p>
+        <p style={{
+          marginTop: 'var(--space-2)',
+          fontSize: 'var(--text-xs)',
+          color: 'var(--color-danger)',
+          textAlign: 'center',
+          marginBottom: 0,
+        }}>
+          {error}
+        </p>
       )}
     </div>
   );

@@ -79,9 +79,17 @@ export function MessageInput({ onSubmit, isLoading }: MessageInputProps) {
   }, []);
 
   return (
-    <form onSubmit={handleSubmit} className="border-t border-slate-200 p-4 bg-white">
-      <div className="flex gap-3 items-end">
-        <div className="flex-1 relative">
+    <form
+      onSubmit={handleSubmit}
+      style={{
+        borderTop: '1px solid var(--border-subtle)',
+        padding: 'var(--space-4) var(--space-5)',
+        background: 'var(--bg-surface)',
+        flexShrink: 0,
+      }}
+    >
+      <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end' }}>
+        <div style={{ flex: 1, position: 'relative' }}>
           <textarea
             ref={textareaRef}
             value={value}
@@ -89,14 +97,28 @@ export function MessageInput({ onSubmit, isLoading }: MessageInputProps) {
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             rows={1}
-            className="w-full resize-none rounded-lg border border-slate-300 px-4 py-3 pr-16 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="input"
+            style={{
+              width: '100%',
+              resize: 'none',
+              paddingRight: 64,
+              minHeight: 44,
+              maxHeight: 200,
+              display: 'block',
+            }}
             disabled={isLoading}
           />
           {/* Character counter — turns red when over the limit */}
           <span
-            className={`absolute bottom-2 right-3 text-xs ${
-              isOverLimit ? 'text-red-500 font-medium' : 'text-slate-400'
-            }`}
+            style={{
+              position: 'absolute',
+              bottom: 'var(--space-2)',
+              right: 'var(--space-3)',
+              fontSize: 'var(--text-xs)',
+              color: isOverLimit ? 'var(--color-danger)' : 'var(--fg-muted)',
+              fontWeight: isOverLimit ? 'var(--weight-medium)' : undefined,
+              pointerEvents: 'none',
+            }}
           >
             {charCount.toLocaleString()}/{config.maxMessageLength.toLocaleString()}
           </span>
@@ -104,14 +126,15 @@ export function MessageInput({ onSubmit, isLoading }: MessageInputProps) {
         <button
           type="submit"
           disabled={!canSubmit}
-          className="rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="btn btn--primary"
+          style={{ flexShrink: 0, minWidth: 72 }}
         >
           {isLoading ? 'Sending...' : 'Send'}
         </button>
       </div>
       {/* Over-limit error message shown below the input */}
       {isOverLimit && (
-        <p className="text-red-500 text-xs mt-1">
+        <p style={{ color: 'var(--color-danger)', fontSize: 'var(--text-xs)', marginTop: 'var(--space-2)', marginBottom: 0 }}>
           Message exceeds {config.maxMessageLength.toLocaleString()} character limit
         </p>
       )}
