@@ -56,19 +56,32 @@ export function ModelSwitcher({ selectedProviderId, onSelect }: ModelSwitcherPro
   const selected = providers.find((p) => p.id === selectedProviderId);
 
   return (
-    <div ref={dropdownRef} className="relative">
+    <div ref={dropdownRef} style={{ position: 'relative' }}>
       {/* Toggle button shows selected model name or placeholder */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-slate-300 hover:bg-slate-50 transition-colors"
+        className="btn btn--ghost btn--sm"
+        style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
       >
         <span>{selected?.displayName ?? 'Select Model'}</span>
-        <span className="text-xs text-slate-400">&#9662;</span>
+        <span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>
       </button>
 
       {/* Dropdown list of providers — only shown when isOpen is true */}
       {isOpen && (
-        <div className="absolute top-full right-0 mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[220px]">
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          right: 0,
+          marginTop: 'var(--space-1)',
+          zIndex: 20,
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-lg)',
+          padding: 'var(--space-1) 0',
+          minWidth: 220,
+        }}>
           {providers.map((provider) => (
             <button
               key={provider.id}
@@ -81,18 +94,37 @@ export function ModelSwitcher({ selectedProviderId, onSelect }: ModelSwitcherPro
                 }
               }}
               disabled={!provider.isAvailable}
-              className={`w-full text-left px-3 py-2 ${
-                !provider.isAvailable
-                  ? 'opacity-50 cursor-not-allowed'
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: 'var(--space-2) var(--space-4)',
+                background: provider.id === selectedProviderId ? 'var(--color-accent-50)' : 'transparent',
+                color: !provider.isAvailable
+                  ? 'var(--fg-disabled)'
                   : provider.id === selectedProviderId
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'hover:bg-slate-50'
-              }`}
+                    ? 'var(--color-accent-700)'
+                    : 'var(--fg-primary)',
+                border: 'none',
+                cursor: provider.isAvailable ? 'pointer' : 'not-allowed',
+                opacity: provider.isAvailable ? 1 : 0.5,
+                display: 'block',
+              }}
+              data-selected={provider.id === selectedProviderId ? 'true' : undefined}
+              onMouseEnter={(e) => {
+                if (provider.isAvailable && provider.id !== selectedProviderId) {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-subtle)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (provider.id !== selectedProviderId) {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                }
+              }}
             >
-              <p className="text-sm font-medium">{provider.displayName}</p>
+              <p style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)' }}>{provider.displayName}</p>
               {/* Show unavailable badge for providers that can't be used */}
               {!provider.isAvailable && (
-                <p className="text-xs text-red-500">Unavailable</p>
+                <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-danger)', marginTop: 2 }}>Unavailable</p>
               )}
             </button>
           ))}

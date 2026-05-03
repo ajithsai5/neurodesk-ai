@@ -89,10 +89,7 @@ export function DocumentLibrary({ refreshKey = 0 }: Props) {
 
     try {
       const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        // Revert: re-fetch the true list
-        void fetchDocs();
-      }
+      if (!res.ok) void fetchDocs();
     } catch {
       void fetchDocs();
     }
@@ -100,40 +97,68 @@ export function DocumentLibrary({ refreshKey = 0 }: Props) {
 
   if (loading) {
     return (
-      <div className="px-3 py-2 text-xs text-slate-400">Loading documents…</div>
+      <div style={{ padding: 'var(--space-3) 0', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        {[1, 2].map((i) => (
+          <div key={i} className="skeleton" style={{ height: 48, borderRadius: 'var(--radius-md)' }} />
+        ))}
+      </div>
     );
   }
 
   if (fetchError) {
     return (
-      <div className="px-3 py-2 text-xs text-red-500">{fetchError}</div>
+      <div style={{ padding: 'var(--space-3) 0', fontSize: 'var(--text-xs)', color: 'var(--color-danger)' }}>
+        {fetchError}
+      </div>
     );
   }
 
   if (docs.length === 0) {
     return (
-      <div className="px-3 py-2 text-xs text-slate-400 italic">
+      <div style={{
+        padding: 'var(--space-5) 0',
+        fontSize: 'var(--text-xs)',
+        color: 'var(--fg-muted)',
+        fontStyle: 'italic',
+        textAlign: 'center',
+      }}>
         No documents yet. Upload a PDF or TXT file.
       </div>
     );
   }
 
   return (
-    <ul className="px-2 space-y-1 overflow-y-auto max-h-52 scrollbar-thin">
+    <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', overflowY: 'auto', maxHeight: 220 }}>
       {docs.map((doc) => (
         <li
           key={doc.id}
-          className="flex items-start gap-2 p-2 rounded-lg bg-slate-100 hover:bg-slate-200 group transition-colors"
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 'var(--space-2)',
+            padding: 'var(--space-3)',
+            borderRadius: 'var(--radius-md)',
+            background: 'var(--bg-subtle)',
+            transition: 'background var(--duration-fast)',
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLLIElement).style.background = 'var(--bg-muted)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLLIElement).style.background = 'var(--bg-subtle)'; }}
+          className="group"
         >
           {/* Document name + metadata */}
-          <div className="flex-1 min-w-0">
-            <p
-              className="text-xs text-slate-800 truncate font-medium"
-              title={doc.originalName}
-            >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{
+              margin: 0,
+              fontSize: 'var(--text-xs)',
+              fontWeight: 'var(--weight-medium)',
+              color: 'var(--fg-primary)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }} title={doc.originalName}>
               {doc.originalName}
             </p>
-            <p className="text-[10px] text-slate-500 mt-0.5">
+            <p style={{ margin: 0, fontSize: 10, color: 'var(--fg-muted)', marginTop: 2 }}>
               {formatBytes(doc.fileSize)}
               {doc.pageCount != null && ` · ${doc.pageCount}p`}
             </p>
@@ -147,7 +172,18 @@ export function DocumentLibrary({ refreshKey = 0 }: Props) {
             <button
               onClick={() => void handleDelete(doc.id)}
               title="Remove document"
-              className="text-slate-400 hover:text-red-500 transition-colors text-xs opacity-0 group-hover:opacity-100"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 'var(--text-xs)',
+                color: 'var(--fg-muted)',
+                padding: 'var(--space-1)',
+                lineHeight: 1,
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-danger)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--fg-muted)'; }}
             >
               ✕
             </button>

@@ -52,17 +52,17 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
   // (Why: guides the user to start typing instead of showing a blank area)
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center text-slate-400">
-        <div className="text-center">
-          <p className="text-lg font-medium">Start a conversation</p>
-          <p className="text-sm mt-1">Type a message below to begin</p>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="empty-state">
+          <p className="empty-state__title">Start a conversation</p>
+          <p className="empty-state__body">Type a message below to begin</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
+    <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-5) var(--space-6)' }}>
       {messages.map((msg, i) => {
         // Only the last assistant message gets the streaming cursor while loading
         // (Why: indicates which message is actively being generated)

@@ -40,8 +40,16 @@ export default defineConfig({
         '**/index.ts',
         // Drizzle schema — DDL declarations, not unit-testable logic
         'src/modules/shared/db/schema.ts',
-        // Sidebar components — out of scope for this sprint (F01.5)
+        // Sidebar + shell layout components — thin UI wiring, covered by E2E not unit tests
         'src/components/sidebar/**',
+        'src/components/shell/**',
+        // Theme provider — zero-logic next-themes wrapper
+        'src/components/theme-provider.tsx',
+        // UI utility — trivial clsx+twMerge wrapper, no business logic to test
+        'src/lib/utils.ts',
+        // F003.5 UI panels — layout/display only, no business logic
+        'src/components/DocumentQAPanel.tsx',
+        'src/components/SettingsPanel.tsx',
         // AST analysis startup utility — depends on the TypeScript compiler API and
         // the real file system; not practical to unit-test without the full src/ tree.
         // Covered by integration smoke-test when running the Next.js dev server.
