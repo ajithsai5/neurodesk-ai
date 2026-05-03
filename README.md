@@ -1,9 +1,9 @@
 # NeuroDesk AI
 
-![](https://img.shields.io/badge/Coverage-91%25-83A603.svg?prefix=$coverage$)
+![](https://img.shields.io/badge/Coverage-95%25-83A603.svg?prefix=$coverage$)
 ![CI](https://github.com/ajithsai5/neurodesk-ai/actions/workflows/ci.yml/badge.svg)
 
-AI-powered desktop assistant — chat, RAG, and memory. Built with Next.js 14, TypeScript, and SQLite.
+AI-powered desktop assistant — chat, document Q&A (RAG), and memory. Built with Next.js 14, TypeScript, and SQLite. Features a Claude-design-system UI with dark mode support.
 
 ## Quick Start
 
@@ -46,10 +46,10 @@ Exits non-zero if any coverage threshold is breached.
 
 | Metric | Threshold |
 |--------|-----------|
-| Statements | ≥ 80% |
-| Branches | ≥ 90% |
-| Functions | ≥ 85% |
-| Lines | ≥ 80% |
+| Statements | ≥ 95% |
+| Branches | ≥ 95% |
+| Functions | ≥ 95% |
+| Lines | ≥ 95% |
 
 ### Run a single test file
 
@@ -68,6 +68,13 @@ start coverage/index.html
 # macOS/Linux
 open coverage/index.html
 ```
+
+## Features
+
+- **Chat** — streaming AI responses with persona selection and model switching
+- **Document Q&A (RAG)** — upload PDFs/text, ask questions with inline source citations
+- **Dark mode** — Claude design system with light/dark themes via CSS custom properties
+- **Multiple LLM providers** — OpenAI and Anthropic; extensible via `llm-client.ts`
 
 ## Architecture
 
