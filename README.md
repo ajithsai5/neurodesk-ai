@@ -13,7 +13,7 @@
 
 NeuroDesk AI is a full-stack AI development assistant that combines **conversational chat**, **document question-answering (RAG)**, and an **in-memory knowledge graph** into a single local-first application. It runs entirely on your machine against Ollama or any cloud LLM provider — no data leaves your network unless you choose a cloud API.
 
-Built with **Next.js 15 App Router**, **TypeScript strict mode**, **Drizzle ORM + SQLite**, and the **Vercel AI SDK**.
+Built with **Next.js 15 App Router**, **TypeScript strict mode**, **Drizzle ORM + SQLite**, the **Vercel AI SDK**, and a custom **Claude design system** with dark mode.
 
 ---
 
@@ -26,6 +26,7 @@ Built with **Next.js 15 App Router**, **TypeScript strict mode**, **Drizzle ORM 
 | F02 | Document Q&A (RAG) | Upload documents, semantic search, inline citations | ✅ Done |
 | F02.5 | Platform Hardening II | Graph module, 95% coverage floor, Dependabot zero, CodeQL green | ✅ Done |
 | F03 | AI Code Assistant + Graph-Enhanced RAG | Code generation & explanation UI; RAG upgraded to top-20 pool with graph reranking → top-5; Citation graph score badge | ✅ Done |
+| F03.5 | UI Redesign | Claude design system (oklch tokens, dark mode, component library); shell layout with NavSidebar + TopBar; streaming cursor; XSS-safe markdown links | ✅ Done |
 | F04 | Memory | Persistent session memory across conversations | 📋 Planned |
 | F05 | Code Analysis | IDE-style file browsing with AST-powered symbol navigation | 📋 Planned |
 | F06 | Agents | Tool-use agents for file operations, web search, shell commands | 📋 Planned |
@@ -115,16 +116,17 @@ curl "http://localhost:3000/api/health"
 
 | Library | Version | Role |
 |---------|---------|------|
-| [Next.js](https://nextjs.org) | 14.2.35 | Full-stack React framework (App Router) |
+| [Next.js](https://nextjs.org) | 15.5.15 | Full-stack React framework (App Router) |
 | [TypeScript](https://typescriptlang.org) | 5.9.3 | Type-safe language (strict mode) |
 | [Drizzle ORM](https://orm.drizzle.team) | 0.45.2 | SQLite schema + type-safe queries |
-| [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) | 11.10.0 | Synchronous SQLite driver |
+| [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) | 12.9.0 | Synchronous SQLite driver |
 | [Vercel AI SDK](https://sdk.vercel.ai) | 4.3.19 | LLM streaming + provider abstraction |
 | [@ai-sdk/openai](https://sdk.vercel.ai/providers/ai-sdk-providers/openai) | 1.3.24 | OpenAI provider |
 | [@ai-sdk/anthropic](https://sdk.vercel.ai/providers/ai-sdk-providers/anthropic) | 1.2.12 | Anthropic provider |
 | [react-force-graph-2d](https://github.com/vasturiano/react-force-graph) | 1.29.1 | 2D knowledge graph visualization |
 | [js-tiktoken](https://github.com/dqbd/tiktoken) | 1.0.21 | Token counting for context window |
 | [Zod](https://zod.dev) | 3.25.76 | Runtime schema validation |
+| [react-markdown](https://github.com/remarkjs/react-markdown) | 10.1.0 | Safe Markdown rendering in chat messages |
 | [Vitest](https://vitest.dev) | 3.2.4 | Unit & integration test runner |
 | [Playwright](https://playwright.dev) | 1.59.1 | End-to-end browser tests |
 | [Tailwind CSS](https://tailwindcss.com) | 3.4.19 | Utility-first CSS |
@@ -184,7 +186,7 @@ Then select the provider in the **Settings** panel. Ollama is not required for c
 | `npm run dev` | Start Next.js dev server at http://localhost:3000 |
 | `npm run build` | Production build |
 | `npm run lint` | ESLint on all TypeScript/TSX files |
-| `npm test` | Run all Vitest tests (155 tests) |
+| `npm test` | Run all Vitest tests (339 tests) |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm test -- --coverage` | Run tests with V8 coverage report |
 | `npm run test:e2e` | Playwright E2E tests |
@@ -196,8 +198,8 @@ Then select the provider in the **Settings** panel. Ollama is not required for c
 ## Tests & CI
 
 ```bash
-npm test                  # 155 unit + integration tests
-npm test -- --coverage    # 91%+ statements / branches / functions / lines
+npm test                  # 339 unit + integration tests
+npm test -- --coverage    # 95%+ statements / branches / functions / lines
 npm run test:e2e          # End-to-end via Playwright (requires running dev server)
 ```
 
@@ -315,9 +317,14 @@ Every TypeScript file under `src/`, what it does, and the public symbols it expo
 | `components/chat/ChatPanel.tsx` | Top-level chat surface; wraps `useChat` hook + message list + input | `ChatPanel` |
 | `components/chat/MessageInput.tsx` | Multiline textarea with 10k-char guard + Enter-to-send | `MessageInput` |
 | `components/chat/MessageList.tsx` | Renders user + assistant message bubbles, scroll-to-bottom on new | `MessageList` |
-| `components/chat/StreamingMessage.tsx` | Renders the in-flight assistant message as tokens arrive | `StreamingMessage` |
-| `components/sidebar/Sidebar.tsx` | Conversation list rail; renders `ConversationItem`s | `Sidebar` |
+| `components/chat/StreamingMessage.tsx` | Renders the in-flight assistant message as tokens arrive; blocks `javascript:`/`data:` URIs in AI-generated links | `StreamingMessage` |
+| `components/shell/NavSidebar.tsx` | Left navigation rail — conversation list, branding, theme toggle | `NavSidebar` |
+| `components/shell/TopBar.tsx` | Top bar with persona selector, model switcher, and settings trigger | `TopBar` |
+| `components/sidebar/ConversationSidebar.tsx` | Conversation list with create/rename/delete actions | `ConversationSidebar` |
 | `components/sidebar/ConversationItem.tsx` | One row in the sidebar — title, date, archive/delete actions | `ConversationItem` |
+| `components/SettingsPanel.tsx` | Provider configuration panel for managing LLM providers | `SettingsPanel` |
+| `components/DocumentQAPanel.tsx` | Document Q&A panel wrapping upload + library + citations | `DocumentQAPanel` |
+| `components/theme-provider.tsx` | next-themes wrapper for SSR-safe dark/light mode switching | `ThemeProvider` |
 
 ### `src/modules/chat/` — Chat domain logic
 
@@ -513,6 +520,21 @@ Four gaps surfaced after F01.5 merged were closed here:
 
 **Milestone**: merged to master, CI green on Node 20 + 22, 95.43% branch coverage, zero open Dependabot alerts, CodeQL clean.
 
+### F03.5 — UI Redesign (Claude Design System) ✅ merged
+
+Full visual redesign replacing ad-hoc Tailwind classes with a purpose-built design system:
+
+- **Design tokens** (`tokens.css`) — oklch color space, electric-indigo accent (hue 270), cool-neutral greys; full dark-mode via `[data-theme="dark"]` overrides.
+- **Component classes** (`components.css`) — `.btn`, `.card`, `.badge`, `.nav-item`, `.sidebar`, `.topbar`, `.skeleton`, `.empty-state`, `.error-state` etc. as reusable CSS classes.
+- **Shell layout** — `NavSidebar` (left rail) + `TopBar` (per-panel header); replaced monolithic `Sidebar.tsx`.
+- **Dark mode** — `next-themes` with `attribute="data-theme"` and `suppressHydrationWarning`; toggle in `NavSidebar`.
+- **New panels** — `SettingsPanel` (provider config), `DocumentQAPanel` (RAG surface), `ConversationSidebar`.
+- **Security** — `StreamingMessage` custom `a` renderer blocks `javascript:` and `data:` URI links in AI-generated Markdown.
+- **Test resilience** — replaced brittle Tailwind class assertions with semantic `data-selected` attributes.
+- Graphify knowledge graph updated: 204 nodes, 172 edges, 84 communities.
+
+**Milestone**: all 95%+ coverage thresholds maintained; zero CI regressions; dark mode confirmed in browser.
+
 ### F03 — Graph-enhanced RAG 🔄 next
 
 Connect the graph layer to the RAG retrieval path end-to-end:
@@ -566,7 +588,7 @@ graphify query "Where is the chat persona system prompt assembled?"
 ### Current snapshot
 
 ```
-111 nodes · 110 edges · 35 communities
+204 nodes · 172 edges · 84 communities
 God nodes: GET (18 edges), POST (12), ingestDocument (9), DELETE (7), handleChatMessage (6)
 ```
 
