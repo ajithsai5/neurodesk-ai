@@ -34,7 +34,12 @@ export async function POST(req: NextRequest) {
         ? body.messages[body.messages.length - 1]?.content
         : undefined);
 
-    const parsed = chatInputSchema.safeParse({ conversationId: body.conversationId, message: messageText });
+    const parsed = chatInputSchema.safeParse({
+      conversationId: body.conversationId,
+      message: messageText,
+      // F004: pass documentIds through for validation (optional field)
+      documentIds: body.documentIds,
+    });
 
     if (!parsed.success) {
       return Response.json(
@@ -43,6 +48,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // T057: parse validated string[] → number[] (empty array treated as "no filter")
+    const documentIds: number[] | undefined =
+      parsed.data.documentIds && parsed.data.documentIds.length > 0
+        ? parsed.data.documentIds.map(Number)
+        : undefined;
+
     // Build RAG context and collect citations if any ready documents exist (FR-017: skip gracefully when none)
     let ragContext: string | undefined;
     let streamData: StreamData | undefined;
@@ -50,7 +61,8 @@ export async function POST(req: NextRequest) {
       const docs = await listDocuments();
       const hasReady = docs.some((d) => d.status === 'ready');
       if (hasReady) {
-        const chunks = await retrieveAndRerank(parsed.data.conversationId, parsed.data.message);
+        // T058: pass documentIds filter to retrieveAndRerank
+        const chunks = await retrieveAndRerank(parsed.data.conversationId, parsed.data.message, documentIds);
         ragContext = formatRagContext(chunks) ?? undefined;
         // Attach citations as a message annotation so the client can render a Sources panel
         // (Why: StreamData annotations travel alongside the SSE stream and are attached to the
