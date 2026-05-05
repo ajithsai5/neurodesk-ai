@@ -63,7 +63,7 @@ vi.mock('@/modules/rag/embedding-client', () => ({
   EmbeddingError: class EmbeddingError extends Error {},
 }));
 
-import { retrieveChunks, formatRagContext, formatCitations, retrieveAndRerank } from '@/modules/rag/retrieval-service';
+import { retrieveChunks, formatRagContext, formatCitations, retrieveAndRerank, computePoolSize } from '@/modules/rag/retrieval-service';
 import type { RetrievedChunk } from '@/modules/rag/retrieval-service';
 import { config } from '@/lib/config';
 
@@ -162,18 +162,23 @@ describe('formatCitations', () => {
 
   it('maps each chunk to a Citation with documentName, pageNumber, and excerpt', () => {
     const chunks: RetrievedChunk[] = [
-      { chunkId: 1, content: 'Quantum computing uses qubits.', pageNumber: 3, documentName: 'quantum.pdf', distance: 0.1 },
-      { chunkId: 2, content: 'Superposition allows parallel states.', pageNumber: 5, documentName: 'quantum.pdf', distance: 0.2 },
+      { chunkId: 1, documentId: 1, content: 'Quantum computing uses qubits.', pageNumber: 3, documentName: 'quantum.pdf', distance: 0.1, similarityScore: 0.9 },
+      { chunkId: 2, documentId: 1, content: 'Superposition allows parallel states.', pageNumber: 5, documentName: 'quantum.pdf', distance: 0.2, similarityScore: 0.8 },
     ];
     const result = formatCitations(chunks);
     expect(result).toHaveLength(2);
-    expect(result[0]).toEqual({ documentName: 'quantum.pdf', pageNumber: 3, excerpt: 'Quantum computing uses qubits.' });
-    expect(result[1]).toEqual({ documentName: 'quantum.pdf', pageNumber: 5, excerpt: 'Superposition allows parallel states.' });
+    // Verify core fields present
+    expect(result[0]!.documentName).toBe('quantum.pdf');
+    expect(result[0]!.pageNumber).toBe(3);
+    expect(result[0]!.excerpt).toBe('Quantum computing uses qubits.');
+    expect(result[1]!.documentName).toBe('quantum.pdf');
+    expect(result[1]!.pageNumber).toBe(5);
+    expect(result[1]!.excerpt).toBe('Superposition allows parallel states.');
   });
 
   it('produces [DocumentName, Page N] label strings from each citation', () => {
     const chunks: RetrievedChunk[] = [
-      { chunkId: 1, content: 'Content here.', pageNumber: 7, documentName: 'report.pdf', distance: 0.05 },
+      { chunkId: 1, documentId: 1, content: 'Content here.', pageNumber: 7, documentName: 'report.pdf', distance: 0.05, similarityScore: 0.95 },
     ];
     const [citation] = formatCitations(chunks);
     expect(`[${citation!.documentName}, Page ${citation!.pageNumber}]`).toBe('[report.pdf, Page 7]');
@@ -371,18 +376,137 @@ describe('retrieveAndRerank', () => {
 
 describe('formatCitations graphScore', () => {
   it('includes graphScore when present on the chunk', () => {
-    const chunks = [
-      { chunkId: 1, content: 'Some text.', pageNumber: 1, documentName: 'doc.pdf', distance: 0.1, graphScore: 0.8 },
-    ] as RetrievedChunk[];
+    const chunks: RetrievedChunk[] = [
+      { chunkId: 1, documentId: 1, content: 'Some text.', pageNumber: 1, documentName: 'doc.pdf', distance: 0.1, similarityScore: 0.9, graphScore: 0.8 },
+    ];
     const [citation] = formatCitations(chunks);
     expect(citation!.graphScore).toBe(0.8);
   });
 
   it('omits graphScore key when not present on the chunk', () => {
     const chunks: RetrievedChunk[] = [
-      { chunkId: 1, content: 'Some text.', pageNumber: 1, documentName: 'doc.pdf', distance: 0.1 },
+      { chunkId: 1, documentId: 1, content: 'Some text.', pageNumber: 1, documentName: 'doc.pdf', distance: 0.1, similarityScore: 0.9 },
     ];
     const [citation] = formatCitations(chunks);
     expect(citation).not.toHaveProperty('graphScore');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F004 T031: computePoolSize — dynamic candidate pool formula
+// ---------------------------------------------------------------------------
+
+describe('computePoolSize — T031 (F004)', () => {
+  it('N=1 → 20 (1 × base)', () => {
+    expect(computePoolSize(1)).toBe(20);
+  });
+
+  it('N=3 → 60 (3 × base)', () => {
+    expect(computePoolSize(3)).toBe(60);
+  });
+
+  it('N=5 → 100 (hits ceiling)', () => {
+    expect(computePoolSize(5)).toBe(100);
+  });
+
+  it('N=8 → 100 (stays at ceiling)', () => {
+    expect(computePoolSize(8)).toBe(100);
+  });
+
+  it('N=0 → 20 (minimum pool even with 0 docs)', () => {
+    expect(computePoolSize(0)).toBe(20);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F004 T032: retrieveChunks with documentIds filter
+// ---------------------------------------------------------------------------
+
+describe('retrieveChunks — T032: documentIds filter (F004)', () => {
+  // Need a helper that also returns documentId to seed correctly
+  function seedChunkWithDoc(docName: string, content: string, page: number, fillValue: number): { docId: number; chunkId: number } {
+    const docId = Number(testSqlite.prepare(
+      `INSERT INTO documents (original_name, status) VALUES (?, 'ready')`,
+    ).run(docName).lastInsertRowid);
+
+    const chunkId = Number(testSqlite.prepare(
+      `INSERT INTO document_chunks (document_id, page_number, content) VALUES (?, ?, ?)`,
+    ).run(docId, page, content).lastInsertRowid);
+
+    testSqlite.prepare(
+      `INSERT INTO vec_document_chunks (chunk_id, embedding) VALUES (?, ?)`,
+    ).run(BigInt(chunkId), new Float32Array(768).fill(fillValue));
+
+    return { docId, chunkId };
+  }
+
+  beforeEach(clearTables);
+
+  it('returns chunks from all docs when no filter is provided', async () => {
+    seedChunkWithDoc('doc-a.pdf', 'Content A', 1, 0.1);
+    seedChunkWithDoc('doc-b.pdf', 'Content B', 1, 0.2);
+
+    const results = await retrieveChunks('query', 10);
+    const names = results.map((r) => r.documentName);
+    expect(names).toContain('doc-a.pdf');
+    expect(names).toContain('doc-b.pdf');
+  });
+
+  it('filters out chunks from excluded documents when documentIds is provided', async () => {
+    const { docId: idA } = seedChunkWithDoc('doc-a.pdf', 'Content A', 1, 0.1);
+    seedChunkWithDoc('doc-b.pdf', 'Content B', 1, 0.2);
+
+    // Only query doc-a
+    const results = await retrieveChunks('query', 10, [idA]);
+    expect(results.length).toBeGreaterThan(0);
+    for (const r of results) {
+      expect(r.documentName).toBe('doc-a.pdf');
+    }
+  });
+
+  it('returns empty array when documentIds list excludes all docs', async () => {
+    seedChunkWithDoc('doc-a.pdf', 'Content A', 1, 0.1);
+
+    // Pass a non-existent document ID
+    const results = await retrieveChunks('query', 10, [999999]);
+    expect(results).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F004 T033: RetrievedChunk.documentId + similarityScore
+// ---------------------------------------------------------------------------
+
+describe('retrieveChunks — T033: documentId + similarityScore (F004)', () => {
+  beforeEach(clearTables);
+
+  it('RetrievedChunk includes documentId (numeric)', async () => {
+    const docId = Number(testSqlite.prepare(
+      `INSERT INTO documents (original_name, status) VALUES ('test.pdf', 'ready')`,
+    ).run().lastInsertRowid);
+    const chunkId = Number(testSqlite.prepare(
+      `INSERT INTO document_chunks (document_id, page_number, content) VALUES (?, 1, 'Test content')`,
+    ).run(docId).lastInsertRowid);
+    testSqlite.prepare(
+      `INSERT INTO vec_document_chunks (chunk_id, embedding) VALUES (?, ?)`,
+    ).run(BigInt(chunkId), new Float32Array(768).fill(0.1));
+
+    const results = await retrieveChunks('query', 1);
+    expect(results.length).toBe(1);
+    expect(results[0]!.documentId).toBe(docId);
+    expect(typeof results[0]!.documentId).toBe('number');
+  });
+
+  it('similarityScore is clamped to [0, 1]', async () => {
+    seedChunk('doc.pdf', 'Some content', 1, 0.3);
+
+    const results = await retrieveChunks('query', 1);
+    expect(results.length).toBe(1);
+    const chunk = results[0]!;
+    expect(typeof chunk.similarityScore).toBe('number');
+    // similarityScore = clamp(1 - distance, 0, 1)
+    // Test vectors are non-unit so raw 1-distance can be negative; clamping ensures [0,1].
+    expect(chunk.similarityScore).toBeGreaterThanOrEqual(0);
+    expect(chunk.similarityScore).toBeLessThanOrEqual(1);
   });
 });

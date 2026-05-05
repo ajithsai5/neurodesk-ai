@@ -35,4 +35,15 @@ export const config = {
   // (Why: wider pool gives graph reranking more to work with; final context stays small)
   ragCandidatePoolSize: 20,
   ragFinalContextSize: 5,
+
+  // F004: Document library hard limits (enforced at API boundary before ingestion)
+  // (Why: prevents unbounded storage growth and keeps vector index query times predictable)
+  libraryMaxDocuments: 50,
+  libraryMaxBytes: 524_288_000, // 500 MB
+
+  // F004: Dynamic candidate pool formula: min(ragDynamicPoolBase × N, ragDynamicPoolMax)
+  // where N = number of in-scope documents (filtered set or full library when no filter active)
+  // (Why: scales candidate breadth with library size while bounding query cost at ~100 chunks)
+  ragDynamicPoolBase: 20,
+  ragDynamicPoolMax: 100,
 } as const;

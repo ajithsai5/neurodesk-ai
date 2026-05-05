@@ -159,6 +159,8 @@ export async function ingestDocument(documentId: number): Promise<void> {
           chunkIndex: chunk.chunkIndex,
           content: chunk.content,
           tokenCount: chunk.tokenCount,
+          // F004: propagate userId from parent document so chunks are queryable by user
+          userId: doc.userId,
         })
         .returning({ id: documentChunks.id });
 
