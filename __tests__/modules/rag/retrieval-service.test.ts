@@ -262,21 +262,22 @@ describe('retrieveChunks', () => {
 // ---------------------------------------------------------------------------
 
 describe('formatRagContext graphScore', () => {
-  it('includes Graph Score in source header when graphScore is present', () => {
+  it('includes Graph in source header when graphScore is present (F004 T069 short label)', () => {
     const chunks: RetrievedChunk[] = [
-      { chunkId: 1, content: 'Content.', pageNumber: 3, documentName: 'doc.pdf', distance: 0.1, graphScore: 4 },
+      { chunkId: 1, documentId: 1, content: 'Content.', pageNumber: 3, documentName: 'doc.pdf', distance: 0.1, similarityScore: 0.9, graphScore: 4 },
     ];
     const result = formatRagContext(chunks)!;
-    expect(result).toContain('Source: doc.pdf, Page 3, Graph Score: 4');
+    // F004 format: "Graph: 4" (short form)
+    expect(result).toContain('Graph: 4');
   });
 
-  it('omits Graph Score in source header when graphScore is absent', () => {
+  it('omits Graph in source header when graphScore is absent', () => {
     const chunks: RetrievedChunk[] = [
-      { chunkId: 1, content: 'Content.', pageNumber: 3, documentName: 'doc.pdf', distance: 0.1 },
+      { chunkId: 1, documentId: 1, content: 'Content.', pageNumber: 3, documentName: 'doc.pdf', distance: 0.1, similarityScore: 0.9 },
     ];
     const result = formatRagContext(chunks)!;
     expect(result).toContain('Source: doc.pdf, Page 3');
-    expect(result).not.toContain('Graph Score');
+    expect(result).not.toContain('Graph:');
   });
 
   it('updates the cite-as instruction to include Graph Score variant', () => {
@@ -391,6 +392,93 @@ describe('formatCitations graphScore', () => {
     ];
     const [citation] = formatCitations(chunks);
     expect(citation).not.toHaveProperty('graphScore');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F004 T063: Citation interface has documentTitle + badgeColour
+// ---------------------------------------------------------------------------
+
+describe('Citation interface — T063 (F004)', () => {
+  it('formatCitations populates documentTitle from chunk.documentName', () => {
+    const chunks: RetrievedChunk[] = [
+      { chunkId: 1, documentId: 5, content: 'Content.', pageNumber: 2, documentName: 'my-doc.pdf', distance: 0.1, similarityScore: 0.9 },
+    ];
+    const [citation] = formatCitations(chunks);
+    expect(citation!.documentTitle).toBe('my-doc.pdf');
+  });
+
+  it('formatCitations populates documentId on each citation', () => {
+    const chunks: RetrievedChunk[] = [
+      { chunkId: 1, documentId: 42, content: 'Content.', pageNumber: 1, documentName: 'doc.pdf', distance: 0.1, similarityScore: 0.9 },
+    ];
+    const [citation] = formatCitations(chunks);
+    expect(citation!.documentId).toBe(42);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F004 T064: formatCitations returns badgeColour from badgeMap
+// ---------------------------------------------------------------------------
+
+describe('formatCitations — T064: badgeColour from badgeMap (F004)', () => {
+  it('populates badgeColour from the supplied badgeMap', () => {
+    const chunks: RetrievedChunk[] = [
+      { chunkId: 1, documentId: 3, content: 'Content.', pageNumber: 1, documentName: 'doc.pdf', distance: 0.1, similarityScore: 0.87 },
+    ];
+    const badgeMap = new Map([[3, '#E86C3A']]);
+    const [citation] = formatCitations(chunks, badgeMap);
+    expect(citation!.badgeColour).toBe('#E86C3A');
+  });
+
+  it('omits badgeColour when document is not in the badgeMap', () => {
+    const chunks: RetrievedChunk[] = [
+      { chunkId: 1, documentId: 99, content: 'Content.', pageNumber: 1, documentName: 'doc.pdf', distance: 0.1, similarityScore: 0.9 },
+    ];
+    const badgeMap = new Map([[3, '#E86C3A']]); // doc 99 not in map
+    const [citation] = formatCitations(chunks, badgeMap);
+    expect(citation).not.toHaveProperty('badgeColour');
+  });
+
+  it('rounds similarityScore to 2 decimal places', () => {
+    const chunks: RetrievedChunk[] = [
+      { chunkId: 1, documentId: 1, content: 'Content.', pageNumber: 1, documentName: 'doc.pdf', distance: 0.1, similarityScore: 0.87654 },
+    ];
+    const [citation] = formatCitations(chunks);
+    expect(citation!.similarityScore).toBe(0.88);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F004 T065: formatRagContext includes Sim score in source header
+// ---------------------------------------------------------------------------
+
+describe('formatRagContext — T065: Sim score in header (F004)', () => {
+  it('includes Sim: X.XX in source header when similarityScore is present', () => {
+    const chunks: RetrievedChunk[] = [
+      { chunkId: 1, documentId: 1, content: 'Content.', pageNumber: 3, documentName: 'paper.pdf', distance: 0.13, similarityScore: 0.87 },
+    ];
+    const result = formatRagContext(chunks)!;
+    expect(result).toContain('Sim: 0.87');
+  });
+
+  it('includes both Sim and Graph Score when graphScore is present', () => {
+    const chunks: RetrievedChunk[] = [
+      { chunkId: 1, documentId: 1, content: 'X.', pageNumber: 1, documentName: 'doc.pdf', distance: 0.1, similarityScore: 0.9, graphScore: 4 },
+    ];
+    const result = formatRagContext(chunks)!;
+    expect(result).toContain('Sim: 0.9');
+    expect(result).toContain('Graph: 4');
+  });
+
+  it('omits Sim from header when similarityScore is undefined', () => {
+    const chunks: RetrievedChunk[] = [
+      // Old-style chunk without similarityScore (backward compat)
+      { chunkId: 1, documentId: 1, content: 'X.', pageNumber: 1, documentName: 'doc.pdf', distance: 0.1, similarityScore: 0 },
+    ];
+    const result = formatRagContext(chunks)!;
+    // 0 is falsy so should not show
+    expect(result).not.toContain('Sim: 0');
   });
 });
 

@@ -218,12 +218,20 @@ export async function retrieveAndRerank(
 /**
  * A single citation referencing a source page in an uploaded document.
  * Sent as a message annotation so the client can render a Sources panel.
- * F004: adds documentId, badgeColour, similarityScore.
+ *
+ * F004 additions:
+ *  - documentId: numeric ID for the source document
+ *  - documentTitle: human-readable document name (mirrors documentName for spec compliance)
+ *  - badgeColour: hex colour from BADGE_PALETTE (populated when badgeMap provided)
+ *  - similarityScore: cosine similarity 0.0–1.0, two decimal places
  */
 export interface Citation {
   /** F004: numeric document ID */
   documentId?: number;
+  /** Legacy field — same value as documentTitle; kept for backward compatibility */
   documentName: string;
+  /** F004: human-readable document name per POST /api/chat contract (= documentName) */
+  documentTitle?: string;
   /** F004: hex colour from badge palette */
   badgeColour?: string;
   pageNumber: number;
@@ -235,8 +243,10 @@ export interface Citation {
 
 /**
  * Convert retrieved chunks into Citation objects for the client-side Sources panel.
- * Preserves graphScore when present on the chunk (set by graph-enhanced retrieval).
- * F004: includes documentId, similarityScore, and badgeColour (when provided via chunkMeta).
+ * F004: populates documentTitle, documentId, similarityScore; badgeColour from badgeMap.
+ *
+ * @param chunks   - Retrieved chunks from retrieveAndRerank
+ * @param badgeMap - Optional map of documentId → hex colour from BADGE_PALETTE
  */
 export function formatCitations(
   chunks: RetrievedChunk[],
@@ -245,6 +255,7 @@ export function formatCitations(
   return chunks.map((chunk) => ({
     documentId: chunk.documentId,
     documentName: chunk.documentName,
+    documentTitle: chunk.documentName, // F004: spec-compliant alias
     ...(badgeMap?.has(chunk.documentId) && { badgeColour: badgeMap.get(chunk.documentId) }),
     pageNumber: chunk.pageNumber,
     excerpt: chunk.content,
@@ -263,10 +274,11 @@ export function formatRagContext(chunks: RetrievedChunk[]): string | null {
   if (chunks.length === 0) return null;
 
   const sections = chunks.map((chunk) => {
-    const scoreLabel = chunk.graphScore !== undefined
-      ? `, Graph Score: ${chunk.graphScore}`
-      : '';
-    return `--- Source: ${chunk.documentName}, Page ${chunk.pageNumber}${scoreLabel} ---\n${chunk.content}`;
+    // F004 (T069): include Sim and Graph scores in the source header so the LLM
+    // knows each passage's relevance confidence when formulating the answer.
+    const simLabel = chunk.similarityScore ? `, Sim: ${chunk.similarityScore.toFixed(2)}` : '';
+    const graphLabel = chunk.graphScore !== undefined ? `, Graph: ${chunk.graphScore}` : '';
+    return `--- Source: ${chunk.documentName}, Page ${chunk.pageNumber}${simLabel}${graphLabel} ---\n${chunk.content}`;
   });
 
   return [

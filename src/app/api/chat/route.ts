@@ -68,11 +68,17 @@ export async function POST(req: NextRequest) {
         // (Why: StreamData annotations travel alongside the SSE stream and are attached to the
         //  assistant message by the useChat hook — keeping UI and text in sync)
         if (chunks.length > 0) {
+          // F004 (T068): build badgeMap so formatCitations can include badge colours in each citation
+          const badgeMap = new Map<number, string>(
+            docs
+              .filter((d) => d.badgeColour)
+              .map((d) => [d.id, d.badgeColour] as [number, string]),
+          );
           streamData = new StreamData();
           // JSON.parse/stringify ensures the value satisfies JSONValue (which requires an index
           // signature that the Citation interface intentionally omits for clean typing)
           streamData.appendMessageAnnotation(
-            JSON.parse(JSON.stringify({ citations: formatCitations(chunks) }))
+            JSON.parse(JSON.stringify({ citations: formatCitations(chunks, badgeMap) }))
           );
         }
       }
