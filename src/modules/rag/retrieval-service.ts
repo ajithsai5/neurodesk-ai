@@ -18,7 +18,7 @@ import { documents } from '@/modules/shared/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { generateEmbedding } from './embedding-client';
 import { config } from '@/lib/config';
-import { writeChunkNodes, rerankWithGraph } from '@/modules/graph/graph-service';
+import { writeChunkNodes, rerankWithGraph, createCrossDocumentEdges } from '@/modules/graph/graph-service';
 
 // ---------------------------------------------------------------------------
 // T035: Updated RetrievedChunk — adds documentId + similarityScore
@@ -190,10 +190,18 @@ export async function retrieveAndRerank(
       id: String(c.chunkId),
       text: c.content,
       documentId: c.documentName, // graph nodes use string IDs; documentName is the readable key
+      documentTitle: c.documentName, // F004: also persist as documentTitle for rich node metadata
       pageNumber: c.pageNumber,
       similarityScore: c.similarityScore,
       retrievedAt: Date.now(),
     })),
+  );
+
+  // T050: Fire-and-forget cross-document edges after writing chunk nodes.
+  // Errors are caught inside createCrossDocumentEdges and never propagate.
+  void createCrossDocumentEdges(
+    sessionId,
+    pool.map((c) => ({ id: String(c.chunkId), text: c.content, documentId: c.documentId })),
   );
 
   // Re-rank by graph edge weight; candidates without graph edges keep original order

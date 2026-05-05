@@ -76,6 +76,8 @@ vi.mock('@/modules/graph/graph-service', () => ({
   rerankWithGraph: vi.fn().mockImplementation((_sessionId: string, candidates: unknown[]) =>
     Promise.resolve(candidates)
   ),
+  // F004: T050 — fire-and-forget; must be in mock to avoid "no export" error
+  createCrossDocumentEdges: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { writeChunkNodes, rerankWithGraph } from '@/modules/graph/graph-service';
