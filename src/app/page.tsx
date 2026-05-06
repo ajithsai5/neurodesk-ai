@@ -13,6 +13,8 @@ export default function Home() {
   const [activePanel, setActivePanel] = useState<PanelId>('chat');
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  // T060: document filter state — lifted so ChatPanel can read it while DocumentQAPanel sets it
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<number[]>([]);
 
   const handleNewConversation = useCallback(async () => {
     const res = await fetch('/api/conversations', {
@@ -47,10 +49,17 @@ export default function Home() {
         />
         <main style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           {activePanel === 'chat' && (
-            <ChatPanel key={`chat-${activeConversationId}`} conversationId={activeConversationId} />
+            <ChatPanel
+              key={`chat-${activeConversationId}`}
+              conversationId={activeConversationId}
+              documentIds={selectedDocumentIds.length > 0 ? selectedDocumentIds : undefined}
+            />
           )}
           {activePanel === 'documents' && (
-            <DocumentQAPanel conversationId={activeConversationId} />
+            <DocumentQAPanel
+              conversationId={activeConversationId}
+              onFilterChange={setSelectedDocumentIds}
+            />
           )}
           {activePanel === 'code' && (
             <div style={{ flex: 1, overflowY: 'auto' }}>

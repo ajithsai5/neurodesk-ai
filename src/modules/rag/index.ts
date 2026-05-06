@@ -39,13 +39,14 @@ export {
   resetStuckDocuments,
   assignBadgeColour,
   BADGE_PALETTE,
+  // T078: LibraryLimitError is a class — export as value so `instanceof` works outside this module
+  LibraryLimitError,
 } from './document-service';
 export type {
   DocumentRecord,
   CreateDocumentResult,
   DuplicateDocumentResult,
   LibraryUsage,
-  LibraryLimitError,
 } from './document-service';
 export { extractPages } from './pdf-extractor';
 export type { ExtractedPage } from './pdf-extractor';

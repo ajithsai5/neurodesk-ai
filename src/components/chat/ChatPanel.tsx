@@ -19,12 +19,17 @@ import { ModelSwitcher } from '@/components/ModelSwitcher';
 // @field conversationId - Active conversation ID or null when no conversation is selected
 interface ChatPanelProps {
   conversationId: string | null;
+  /**
+   * T061: When set, only chunks from these document IDs are used for RAG context.
+   * Undefined (or empty) means "all documents" — no filter applied.
+   */
+  documentIds?: number[];
 }
 
 // Render the full chat panel with toolbar, messages, error banner, and input
 // Manages conversation loading, message sending, and persona/provider switching
 // @param conversationId - The active conversation, or null to show the welcome screen
-export function ChatPanel({ conversationId }: ChatPanelProps) {
+export function ChatPanel({ conversationId, documentIds }: ChatPanelProps) {
   // Track current persona and provider for the toolbar selectors
   const [personaId, setPersonaId] = useState<string | null>(null);
   const [providerId, setProviderId] = useState<string | null>(null);
@@ -41,8 +46,15 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
   } = useChat({
     api: '/api/chat',
     id: conversationId ?? undefined,
-    // Pass conversationId in the request body for the chat service
-    body: { conversationId },
+    // Pass conversationId and optional document filter in the request body
+    // T061: documentIds is sent as string[] because JSON body values are strings;
+    // the route handler converts them back to number[] via .map(Number)
+    body: {
+      conversationId,
+      ...(documentIds && documentIds.length > 0 && {
+        documentIds: documentIds.map(String),
+      }),
+    },
     initialMessages: [],
   });
 
