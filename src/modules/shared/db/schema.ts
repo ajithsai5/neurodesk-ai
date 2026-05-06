@@ -106,6 +106,9 @@ export const graphEdges = sqliteTable('graph_edges', {
   relationship: text('relationship', { enum: ['FOLLOWS', 'REFERENCES', 'PART_OF', 'SIMILAR_TO'] }).notNull(),
   // weight is used for graph-based RAG re-ranking (higher = stronger connection)
   weight: real('weight').notNull().default(1.0),
+  // F004: properties stores optional JSON metadata for the edge (e.g. shared token count for SIMILAR_TO)
+  // Nullable — only populated when additional context is useful for downstream consumers
+  properties: text('properties'),
   createdAt: integer('created_at').notNull(),
 }, (table) => [
   index('idx_graph_edges_source').on(table.sourceId),
@@ -156,10 +159,19 @@ export const documents = sqliteTable('documents', {
   contentHash: text('content_hash').notNull().unique(),
   // errorMessage is populated when status = 'failed'; null otherwise
   errorMessage: text('error_message'),
+  // F004: userId scopes documents to a user — fixed 'default' in v1, reserved for F006 multi-user
+  // (Why: column added now so schema is forward-compatible without a future breaking migration)
+  userId: text('user_id').notNull().default('default'),
+  // F004: badgeColour is a hex colour assigned once at upload time (e.g. '#E86C3A')
+  // Persisted in the DB so the colour is stable across server restarts.
+  // (Why: colour is derived from palette[existingDocCount % palette.length] at upload time)
+  badgeColour: text('badge_colour').notNull().default(''),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 }, (table) => [
   index('idx_doc_status').on(table.status),
   index('idx_doc_created').on(table.createdAt),
+  // F004: index for per-user document queries (critical for library usage stats)
+  index('idx_doc_user').on(table.userId),
 ]);
 
 // Document chunks table — text segments extracted and split from each document
@@ -173,6 +185,9 @@ export const documentChunks = sqliteTable('document_chunks', {
   chunkIndex: integer('chunk_index').notNull(),
   content: text('content').notNull(),
   tokenCount: integer('token_count').notNull(),
+  // F004: userId mirrors documents.user_id for efficient per-user queries without a JOIN
+  // (Why: avoids JOIN to documents table in hot retrieval path)
+  userId: text('user_id').notNull().default('default'),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 }, (table) => [
   index('idx_chunk_doc').on(table.documentId),

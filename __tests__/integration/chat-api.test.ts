@@ -227,4 +227,78 @@ describe('POST /api/chat', () => {
       expect.objectContaining({ ragContext: undefined })
     );
   });
+
+  // ───────────────────────────────────────────────────────────────────────
+  // F004 T052–T053: documentIds filter on POST /api/chat
+  // ───────────────────────────────────────────────────────────────────────
+
+  // T052: documentIds filter is passed through to retrieveAndRerank as number[]
+  it('T052: passes documentIds as number[] to retrieveAndRerank when provided', async () => {
+    const { listDocuments, retrieveAndRerank, formatRagContext } = await import('@/modules/rag');
+    (listDocuments as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { id: 1, status: 'ready' },
+      { id: 3, status: 'ready' },
+    ]);
+    (retrieveAndRerank as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    (formatRagContext as ReturnType<typeof vi.fn>).mockReturnValueOnce(null);
+
+    const req = makeRequest({
+      conversationId: VALID_CONV_ID,
+      message: 'query',
+      documentIds: ['1', '3'],
+    });
+    await POST(req as any);
+
+    expect(retrieveAndRerank).toHaveBeenCalledWith(
+      VALID_CONV_ID,
+      'query',
+      [1, 3],
+    );
+  });
+
+  // T052: when no documentIds provided, retrieveAndRerank is called without filter
+  it('T052: calls retrieveAndRerank without documentIds when field absent', async () => {
+    const { listDocuments, retrieveAndRerank, formatRagContext } = await import('@/modules/rag');
+    (listDocuments as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { id: 1, status: 'ready' },
+    ]);
+    (retrieveAndRerank as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    (formatRagContext as ReturnType<typeof vi.fn>).mockReturnValueOnce(null);
+
+    const req = makeRequest({ conversationId: VALID_CONV_ID, message: 'query' });
+    await POST(req as any);
+
+    // Third argument should be undefined (no filter)
+    const call = (retrieveAndRerank as ReturnType<typeof vi.fn>).mock.calls[0] as unknown[];
+    expect(call[2]).toBeUndefined();
+  });
+
+  // T053: Zod schema rejects documentIds with non-numeric strings → 400
+  it('T053: returns 400 when documentIds contains non-numeric strings', async () => {
+    const req = makeRequest({
+      conversationId: VALID_CONV_ID,
+      message: 'query',
+      documentIds: ['1', 'abc'],
+    });
+    const res = await POST(req as any);
+    expect(res.status).toBe(400);
+    const body = await res.json() as { error: string; details: unknown };
+    expect(body.error).toBe('Invalid input');
+  });
+
+  // T053: empty documentIds array is treated the same as absent (no filter)
+  it('T053: empty documentIds array is allowed and treated as no filter', async () => {
+    const { listDocuments, retrieveAndRerank, formatRagContext } = await import('@/modules/rag');
+    (listDocuments as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    (retrieveAndRerank as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    (formatRagContext as ReturnType<typeof vi.fn>).mockReturnValueOnce(null);
+
+    const req = makeRequest({
+      conversationId: VALID_CONV_ID,
+      message: 'query',
+      documentIds: [],
+    });
+    const res = await POST(req as any);
+    expect(res.status).toBe(200);
+  });
 });

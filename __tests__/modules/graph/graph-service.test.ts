@@ -52,6 +52,7 @@ import {
   queryCodeEntities,
   rerankWithGraph,
   cascadeDeleteConversation,
+  createCrossDocumentEdges,
 } from '@/modules/graph/graph-service';
 import { db } from '@/modules/shared/db';
 
@@ -306,5 +307,122 @@ describe('cascadeDeleteConversation', () => {
   it('silently degrades when db.delete throws', async () => {
     mockDb.run.mockImplementationOnce(() => { throw new Error('FK error'); });
     await expect(cascadeDeleteConversation('conv-bad')).resolves.toBeUndefined();
+  });
+});
+
+// ─── F004 T042: writeChunkNodes with documentTitle ───────────────────────────
+
+describe('writeChunkNodes — T042: documentTitle (F004)', () => {
+  it('persists documentTitle in node properties JSON when provided', async () => {
+    await writeChunkNodes('sess-1', [
+      {
+        id: 'chunk-1',
+        text: 'Some text',
+        documentId: 'doc-a.pdf',
+        documentTitle: 'Research Paper A.pdf',
+        pageNumber: 3,
+        similarityScore: 0.9,
+        retrievedAt: Date.now(),
+      },
+    ]);
+
+    expect(mockDb.insert).toHaveBeenCalled();
+    const insertCall = (mockDb.values as ReturnType<typeof vi.fn>).mock.calls
+      .find((call: unknown[]) => {
+        const arg = call[0] as { type?: string };
+        return arg?.type === 'CHUNK';
+      });
+    expect(insertCall).toBeDefined();
+    const nodeProps = JSON.parse((insertCall![0] as { properties: string }).properties) as Record<string, unknown>;
+    expect(nodeProps.documentTitle).toBe('Research Paper A.pdf');
+  });
+
+  it('does not include documentTitle key when not provided', async () => {
+    await writeChunkNodes('sess-1', [
+      { id: 'chunk-2', text: 'Other text', documentId: 'doc-b.pdf' },
+    ]);
+
+    const insertCall = (mockDb.values as ReturnType<typeof vi.fn>).mock.calls
+      .find((call: unknown[]) => {
+        const arg = call[0] as { type?: string };
+        return arg?.type === 'CHUNK';
+      });
+    expect(insertCall).toBeDefined();
+    const nodeProps = JSON.parse((insertCall![0] as { properties: string }).properties) as Record<string, unknown>;
+    expect(nodeProps).not.toHaveProperty('documentTitle');
+  });
+});
+
+// ─── F004 T043–T045: createCrossDocumentEdges ────────────────────────────────
+
+describe('createCrossDocumentEdges — T043: creates SIMILAR_TO edge for cross-doc pairs (F004)', () => {
+  it('inserts a SIMILAR_TO edge for two chunks from different docs sharing ≥ 3 tokens', async () => {
+    const chunks = [
+      { id: 'chunk-a', text: 'attention mechanism transformer architecture model', documentId: 1 },
+      { id: 'chunk-b', text: 'attention mechanism transformer model learning',  documentId: 2 },
+    ];
+
+    await createCrossDocumentEdges('sess-x', chunks);
+
+    // insert should have been called at least once for the SIMILAR_TO edge
+    expect(mockDb.insert).toHaveBeenCalled();
+    const edgeCall = (mockDb.values as ReturnType<typeof vi.fn>).mock.calls
+      .find((call: unknown[]) => {
+        const arg = call[0] as { relationship?: string };
+        return arg?.relationship === 'SIMILAR_TO';
+      });
+    expect(edgeCall).toBeDefined();
+    expect((edgeCall![0] as { relationship: string }).relationship).toBe('SIMILAR_TO');
+  });
+
+  it('includes isCrossDocument=true and sharedTokenCount in edge properties', async () => {
+    const chunks = [
+      { id: 'chunk-a', text: 'attention mechanism transformer architecture model', documentId: 1 },
+      { id: 'chunk-b', text: 'attention mechanism transformer model learning',  documentId: 2 },
+    ];
+
+    await createCrossDocumentEdges('sess-x', chunks);
+
+    const edgeCall = (mockDb.values as ReturnType<typeof vi.fn>).mock.calls
+      .find((call: unknown[]) => {
+        const arg = call[0] as { relationship?: string };
+        return arg?.relationship === 'SIMILAR_TO';
+      });
+    const edgeProps = JSON.parse((edgeCall![0] as { properties: string }).properties ?? '{}') as Record<string, unknown>;
+    expect(edgeProps.isCrossDocument).toBe(true);
+    expect(typeof edgeProps.sharedTokenCount).toBe('number');
+    expect(Number(edgeProps.sharedTokenCount)).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('createCrossDocumentEdges — T044: no edges for same-document pairs (F004)', () => {
+  it('does NOT create SIMILAR_TO edges between chunks from the same document', async () => {
+    const chunks = [
+      { id: 'chunk-a', text: 'attention mechanism transformer architecture model', documentId: 1 },
+      { id: 'chunk-b', text: 'attention mechanism transformer model learning',  documentId: 1 }, // same doc
+    ];
+
+    await createCrossDocumentEdges('sess-x', chunks);
+
+    const edgeCall = (mockDb.values as ReturnType<typeof vi.fn>).mock.calls
+      .find((call: unknown[]) => {
+        const arg = call[0] as { relationship?: string };
+        return arg?.relationship === 'SIMILAR_TO';
+      });
+    expect(edgeCall).toBeUndefined();
+  });
+});
+
+describe('createCrossDocumentEdges — T045: error handling (F004)', () => {
+  it('does not propagate errors — resolves without throwing even when insert fails', async () => {
+    mockDb.run.mockImplementationOnce(() => { throw new Error('DB write error'); });
+
+    const chunks = [
+      { id: 'chunk-a', text: 'attention mechanism transformer architecture model', documentId: 1 },
+      { id: 'chunk-b', text: 'attention mechanism transformer model learning',  documentId: 2 },
+    ];
+
+    // Should resolve without throwing (fire-and-forget error handling)
+    await expect(createCrossDocumentEdges('sess-x', chunks)).resolves.toBeUndefined();
   });
 });

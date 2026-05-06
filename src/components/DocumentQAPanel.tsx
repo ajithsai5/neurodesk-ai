@@ -5,9 +5,11 @@ import { DocumentUpload } from '@/components/DocumentUpload';
 import { DocumentLibrary } from '@/components/DocumentLibrary';
 interface DocumentQAPanelProps {
   conversationId: string | null;
+  /** T060: Called when the user changes the active document filter */
+  onFilterChange?: (selectedDocumentIds: number[]) => void;
 }
 
-export function DocumentQAPanel({ conversationId }: DocumentQAPanelProps) {
+export function DocumentQAPanel({ conversationId, onFilterChange }: DocumentQAPanelProps) {
   const [refreshKey, setRefreshKey] = useState(0);
 
   return (
@@ -27,7 +29,7 @@ export function DocumentQAPanel({ conversationId }: DocumentQAPanelProps) {
           <DocumentUpload onUploaded={() => setRefreshKey((k) => k + 1)} />
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-4)' }}>
-          <DocumentLibrary refreshKey={refreshKey} />
+          <DocumentLibrary refreshKey={refreshKey} onFilterChange={onFilterChange} />
         </div>
       </div>
 

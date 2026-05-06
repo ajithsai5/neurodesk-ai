@@ -18,7 +18,12 @@
       "Bash(/c/Users/ajith/AppData/Roaming/Python/Python314/Scripts/graphify.exe update *)",
       "Bash(/c/Users/ajith/AppData/Roaming/Python/Python314/Scripts/graphify.exe claude *)",
       "Bash(npx vitest *)",
-      "Bash(xargs grep *)"
+      "Bash(xargs grep *)",
+      "Bash(powershell.exe -NonInteractive -File \".specify/scripts/powershell/check-prerequisites.ps1\" -Json -PathsOnly)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(npx drizzle-kit *)"
     ]
   }
 }

@@ -2,38 +2,72 @@
 /**
  * Documents API — List and Upload
  *
- * GET  /api/documents  → returns all documents in the library (ordered by most recent)
- * POST /api/documents  → upload a new document; triggers async ingestion pipeline
+ * GET  /api/documents  → returns all documents in the library + library usage stats
+ * POST /api/documents  → upload a new document; enforces library limits; triggers async ingestion
  *
- * Contract: see specs/002-document-qa-rag/contracts/GET-documents.md
- *           and specs/002-document-qa-rag/contracts/POST-documents.md
+ * Contract: see specs/004-multi-document-rag-system/contracts/GET-documents.md
+ *           and specs/004-multi-document-rag-system/contracts/POST-documents.md
+ *
+ * F004 changes:
+ *  - GET: includes `usage: { count, totalBytes, maxCount, maxBytes }` and `badgeColour` per doc
+ *  - POST: enforces 50-document / 500-MB library limits (LIBRARY_COUNT_LIMIT / LIBRARY_STORAGE_LIMIT)
+ *  - Module init: calls resetStuckDocuments() so interrupted ingestions show as "failed" after restart
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createDocument, listDocuments, ingestDocument } from '@/modules/rag';
+import {
+  createDocument,
+  listDocuments,
+  getLibraryUsage,
+  resetStuckDocuments,
+  LibraryLimitError,
+} from '@/modules/rag/document-service';
+import { ingestDocument } from '@/modules/rag';
 
 // Supported MIME types for upload (FR-013)
 const ALLOWED_MIME_TYPES = ['application/pdf', 'text/plain'] as const;
-// 50 MB file size limit (SC-005)
+// 50 MB per-file size limit
 const MAX_FILE_SIZE_BYTES = 52_428_800;
 
 const mimeTypeSchema = z.enum(ALLOWED_MIME_TYPES);
 
+// ---------------------------------------------------------------------------
+// T022: Startup reset — mark any documents that were stuck in 'pending' as 'failed'.
+// Called synchronously at module initialisation (before any request is served).
+// (Why: if the server was killed mid-ingestion, those docs would be stuck forever)
+// ---------------------------------------------------------------------------
+resetStuckDocuments('default');
+
+// ---------------------------------------------------------------------------
+// GET /api/documents
+// ---------------------------------------------------------------------------
 export async function GET() {
   try {
-    const docs = await listDocuments();
+    const [docs, usage] = await Promise.all([
+      listDocuments('default'),
+      getLibraryUsage('default'),
+    ]);
 
-    // Omit internal fields (storedName, filePath, contentHash) from the response
-    const sanitised = docs.map(({ storedName: _s, filePath: _f, contentHash: _h, ...rest }) => rest);
+    // Omit internal fields (storedName, filePath, contentHash, userId) from the response
+    const sanitised = docs.map(({
+      storedName: _s,
+      filePath: _f,
+      contentHash: _h,
+      userId: _u,
+      ...rest
+    }) => rest);
 
-    return NextResponse.json({ documents: sanitised });
+    return NextResponse.json({ documents: sanitised, usage });
   } catch (err) {
     console.error('[GET /api/documents] Failed to list documents:', err);
     return NextResponse.json({ error: 'Failed to load document library.' }, { status: 500 });
   }
 }
 
+// ---------------------------------------------------------------------------
+// POST /api/documents
+// ---------------------------------------------------------------------------
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -61,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const result = await createDocument(buffer, file.name, file.type);
+    const result = await createDocument(buffer, file.name, file.type, 'default');
 
     if (result.isDuplicate) {
       return NextResponse.json(
@@ -88,6 +122,13 @@ export async function POST(request: NextRequest) {
       { status: 202 },
     );
   } catch (err) {
+    // T024: Return structured 400 for library limit violations
+    if (err instanceof LibraryLimitError) {
+      return NextResponse.json(
+        { error: err.message, code: err.code },
+        { status: 400 },
+      );
+    }
     console.error('[POST /api/documents] Upload failed:', err);
     return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 500 });
   }

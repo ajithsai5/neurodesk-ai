@@ -24,6 +24,11 @@ export const chatInputSchema = z.object({
     .trim()
     .min(1, 'Message cannot be empty')
     .max(config.maxMessageLength, `Message cannot exceed ${config.maxMessageLength} characters`),
+  // F004: optional document filter — numeric strings like ["1","3"] parsed to number[] in route
+  // (Why: IDs come from the client as strings in JSON; regex ensures they're valid integers)
+  documentIds: z
+    .array(z.string().regex(/^\d+$/, 'documentIds must contain only numeric strings'))
+    .optional(),
 });
 
 // ============================================

@@ -36,6 +36,8 @@ const { testSqlite } = vi.hoisted(() => {
       status        TEXT    NOT NULL DEFAULT 'pending',
       content_hash  TEXT    NOT NULL UNIQUE,
       error_message TEXT,
+      user_id       TEXT    NOT NULL DEFAULT 'default',
+      badge_colour  TEXT    NOT NULL DEFAULT '',
       created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
     )
   `);
@@ -48,6 +50,7 @@ const { testSqlite } = vi.hoisted(() => {
       chunk_index INTEGER NOT NULL,
       content     TEXT    NOT NULL,
       token_count INTEGER NOT NULL,
+      user_id     TEXT    NOT NULL DEFAULT 'default',
       created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
     )
   `);

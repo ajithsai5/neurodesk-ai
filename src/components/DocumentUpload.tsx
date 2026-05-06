@@ -59,17 +59,26 @@ export function DocumentUpload({ onUploaded }: Props) {
     }
   }
 
+  // T028: handle multiple files — upload each sequentially so errors surface per-file
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) void handleFile(file);
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    // Upload each file; chain uploads so the spinner stays visible throughout
+    const uploadAll = files.reduce(
+      (chain, file) => chain.then(() => handleFile(file)),
+      Promise.resolve(),
+    );
+    void uploadAll;
   }
 
   return (
     <div>
+      {/* T028: multiple attribute enables multi-file selection in the OS picker */}
       <input
         ref={inputRef}
         type="file"
         accept=".pdf,.txt"
+        multiple
         style={{ display: 'none' }}
         onChange={handleChange}
         disabled={uploading}

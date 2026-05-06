@@ -14,6 +14,9 @@ export {
   queryCodeEntities,
   rerankWithGraph,
   cascadeDeleteConversation,
+  // T079: F004 additions — cross-document edge builder and stopword set
+  createCrossDocumentEdges,
+  STOPWORDS,
 } from './graph-service';
 
 export type {

@@ -27,12 +27,13 @@ Built with **Next.js 15 App Router**, **TypeScript strict mode**, **Drizzle ORM 
 | F02.5 | Platform Hardening II | Graph module, 95% coverage floor, Dependabot zero, CodeQL green | ✅ Done |
 | F03 | AI Code Assistant + Graph-Enhanced RAG | Code generation & explanation UI; RAG upgraded to top-20 pool with graph reranking → top-5; Citation graph score badge | ✅ Done |
 | F03.5 | UI Redesign | Claude design system (oklch tokens, dark mode, component library); shell layout with NavSidebar + TopBar; streaming cursor; XSS-safe markdown links | ✅ Done |
-| F04 | Memory | Persistent session memory across conversations | 📋 Planned |
-| F05 | Code Analysis | IDE-style file browsing with AST-powered symbol navigation | 📋 Planned |
-| F06 | Agents | Tool-use agents for file operations, web search, shell commands | 📋 Planned |
-| F07 | Embeddings | Custom embedding models for domain-specific vector search | 📋 Planned |
-| F08 | Collaboration | Multi-user workspaces with shared conversations | 📋 Planned |
-| F09 | Plugins | Third-party plugin system for custom tools and data sources | 📋 Planned |
+| F04 | Multi-Document RAG System | Upload multiple docs; colour-coded badges; per-doc filter in chat; cross-document knowledge graph edges; similarity + graph score in citations; library usage bar | ✅ Done |
+| F05 | Memory | Persistent session memory across conversations | 📋 Planned |
+| F06 | Code Analysis | IDE-style file browsing with AST-powered symbol navigation | 📋 Planned |
+| F07 | Agents | Tool-use agents for file operations, web search, shell commands | 📋 Planned |
+| F08 | Embeddings | Custom embedding models for domain-specific vector search | 📋 Planned |
+| F09 | Collaboration | Multi-user workspaces with shared conversations | 📋 Planned |
+| F10 | Plugins | Third-party plugin system for custom tools and data sources | 📋 Planned |
 
 ---
 
@@ -105,6 +106,66 @@ graph TD
 ```
 
 Dependencies flow one way: **Components → API Routes → Chat/Graph Modules → Shared Module**. No circular imports.
+
+---
+
+## Multi-Document RAG System (F04)
+
+Upload up to **50 documents** (500 MB total) and ask questions that span multiple sources. The system retrieves from all documents simultaneously, re-ranks with the knowledge graph, and shows colour-coded citations per source.
+
+### Cross-document knowledge graph
+
+```mermaid
+graph LR
+    subgraph "Doc A — clinical-trial.pdf"
+        A1[Chunk: methodology]
+        A2[Chunk: results]
+    end
+    subgraph "Doc B — protocol.pdf"
+        B1[Chunk: dosing]
+        B2[Chunk: inclusion criteria]
+    end
+    subgraph "Knowledge Graph"
+        A1 -->|SIMILAR_TO| B1
+        A2 -->|SIMILAR_TO| B2
+    end
+    subgraph "Retrieval"
+        VEC[Vector search<br/>top-K candidates]
+        GR[Graph re-rank<br/>by edge weight]
+        CTX[LLM context<br/>top-5 chunks]
+    end
+    A1 & A2 & B1 & B2 --> VEC --> GR --> CTX
+```
+
+`SIMILAR_TO` edges are created when two chunks from **different** documents share ≥ 3 significant non-stop-word tokens. At query time, chunks with stronger cross-document connections are promoted in the final ranking.
+
+### Document library
+
+| UI element | What it does |
+|------------|--------------|
+| **Colour badge dot** | Each document gets a unique hex colour from an 8-colour palette, persisted at upload time |
+| **Usage bar** | Shows `N / 50 documents` and `X MB / 500 MB` with a warning at 80% |
+| **Pending spinner** | Rows with `pending` status show a rotating icon while ingestion is running (polls every 3 s) |
+| **Completion toast** | A green notification fires when a document flips from `pending → ready` |
+| **Filter checkboxes** | Check one or more `ready` documents to restrict retrieval to that subset |
+
+### Using the document filter
+
+1. Open the **Documents** panel (second icon in the left rail)
+2. Upload one or more PDF or TXT files — each gets a unique badge colour
+3. **Check** the documents you want the next chat to draw from — the label changes to `Filtering: N docs`
+4. Switch to the **Chat** panel — all messages now only retrieve from your selected documents
+5. Hit **Clear filter** in the Documents panel to return to all-document retrieval
+
+### Citations panel (F04 additions)
+
+Each cited source now shows three indicators:
+
+| Indicator | What it means |
+|-----------|---------------|
+| 🔵 Colour dot | Matches the badge colour of the source document |
+| `87%` blue pill | Cosine similarity between the query and this chunk |
+| `0.45` grey badge | Graph re-rank score (only shown when graph boosting applied) |
 
 ---
 
@@ -208,7 +269,7 @@ Then select the provider in the **Settings** panel. Ollama is not required for c
 | `npm run dev` | Start Next.js dev server at http://localhost:3000 |
 | `npm run build` | Production build |
 | `npm run lint` | ESLint on all TypeScript/TSX files |
-| `npm test` | Run all Vitest tests (339 tests) |
+| `npm test` | Run all Vitest tests (384 tests) |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm test -- --coverage` | Run tests with V8 coverage report |
 | `npm run test:e2e` | Playwright E2E tests |
@@ -220,8 +281,7 @@ Then select the provider in the **Settings** panel. Ollama is not required for c
 ## Tests & CI
 
 ```bash
-npm test                  # 339 unit + integration tests
-npm test -- --coverage    # 95%+ statements / branches / functions / lines
+npm test                  # 384 unit + integration tests
 npm run test:e2e          # End-to-end via Playwright (requires running dev server)
 ```
 
@@ -238,6 +298,18 @@ npm run test:e2e          # End-to-end via Playwright (requires running dev serv
 **CodeQL** runs weekly (Monday 03:00 UTC) and on every push to `master` for static security analysis.
 
 **Dependabot** opens daily npm PRs (patch bumps auto-merge) and weekly GitHub Actions update PRs.
+
+---
+
+## Security
+
+### Known advisories
+
+| Advisory | Package | Severity | Impact on this project |
+|----------|---------|----------|------------------------|
+| [GHSA-rwvc-j5jr-mgvh](https://github.com/advisories/GHSA-rwvc-j5jr-mgvh) | `ai@<5.0.52` | Low | File-type whitelist bypass in Vercel AI SDK's built-in file-upload handler. **NeuroDesk does not use the AI SDK for file uploads** — all document handling goes through our own multipart form handler in `api/documents/route.ts` with independent MIME-type validation and a 50 MB size cap. Not directly exploitable here. Fix requires upgrading to `ai@6.x` which is a breaking change incompatible with our provider SDK versions. Tracked for the next dependency-maintenance window. |
+
+CodeQL runs weekly on `master` and on every PR for static security analysis (JavaScript + TypeScript). Dependabot opens daily npm patch PRs and weekly Actions update PRs.
 
 ---
 
@@ -335,8 +407,8 @@ Every TypeScript file under `src/`, what it does, and the public symbols it expo
 | `components/ModelSwitcher.tsx` | Dropdown for picking the active LLM provider/model | `ModelSwitcher` |
 | `components/PersonaSelector.tsx` | Dropdown for picking the active persona (system prompt) | `PersonaSelector` |
 | `components/GraphPanel.tsx` | Force-directed graph view of the current session's nodes/edges | `GraphPanel` |
-| `components/CitationPanel.tsx` | Inline citations rendered alongside RAG answers | `CitationPanel` |
-| `components/DocumentLibrary.tsx` | Lists ingested RAG documents with status + delete | `DocumentLibrary` |
+| `components/CitationPanel.tsx` | Collapsible Sources panel — badge dot, similarity % pill, graph score badge per citation | `CitationPanel` |
+| `components/DocumentLibrary.tsx` | Lists RAG docs with colour badges, usage bar, filter checkboxes, completion toasts | `DocumentLibrary` |
 | `components/DocumentStatus.tsx` | Per-document ingestion status badge | `DocumentStatus` |
 | `components/DocumentUpload.tsx` | Drag-and-drop file upload → POST `/api/documents` | `DocumentUpload` |
 | `components/chat/ChatPanel.tsx` | Top-level chat surface; wraps `useChat` hook + message list + input | `ChatPanel` |
@@ -365,7 +437,7 @@ Every TypeScript file under `src/`, what it does, and the public symbols it expo
 
 | File | Purpose | Public exports |
 |------|---------|----------------|
-| `graph/graph-service.ts` | High-level graph API: `writeConversationNode`, `queryCodeEntities`, `cascadeDeleteConversation`, `rerankWithGraph` | the named functions above |
+| `graph/graph-service.ts` | High-level graph API: `writeConversationNode`, `queryCodeEntities`, `cascadeDeleteConversation`, `rerankWithGraph`; F04: `createCrossDocumentEdges`, `STOPWORDS`, `extractSignificantTokens` | the named functions above |
 | `graph/graph-client.ts` | Low-level Drizzle wrapper: `getGraphStats`, `queryGraph`, `writeChunkNodes` | the named functions above |
 | `graph/ast-analysis.ts` | TypeScript Compiler API pass that seeds CODE_ENTITY nodes on startup | `initAstAnalysis` |
 | `graph/graphify-bridge.ts` | Reads `graphify-out/graph.json` and exposes substring queries to chat-service | `loadGraphifyIndex`, `queryGraphifyEntities`, `resetGraphifyCache` |
@@ -376,10 +448,10 @@ Every TypeScript file under `src/`, what it does, and the public symbols it expo
 
 | File | Purpose | Public exports |
 |------|---------|----------------|
-| `rag/document-service.ts` | DB CRUD for documents — `createDocument`, `getDocument`, `listDocuments`, `deleteDocument`, `findByHash`, `updateDocumentStatus` | the named functions above |
+| `rag/document-service.ts` | DB CRUD for documents; F04: `BADGE_PALETTE`, `assignBadgeColour`, `getLibraryUsage`, `resetStuckDocuments`, `LibraryLimitError` (50-doc / 500 MB limits) | the named functions above |
 | `rag/ingestion-pipeline.ts` | End-to-end ingest: extract → chunk → embed → store → write graph nodes | `ingestDocument` |
 | `rag/embedding-client.ts` | Ollama `nomic-embed-text` wrapper with retry + typed errors | `generateEmbedding`, `EmbeddingError` |
-| `rag/retrieval-service.ts` | Vector search over `sqlite-vec` + graph re-rank + citation formatting | `retrieveChunks`, `formatRagContext`, `formatCitations` |
+| `rag/retrieval-service.ts` | Vector search over `sqlite-vec` + graph re-rank + citation formatting; F04: `computePoolSize`, `countReadyDocuments`, `documentIds` filter, `similarityScore` | `retrieveChunks`, `retrieveAndRerank`, `formatRagContext`, `formatCitations` |
 | `rag/pdf-extractor.ts` | PDF → page text via `pdf-parse/lib/pdf-parse.js` subpath | `extractPages`, `loadPdfParse` |
 | `rag/txt-extractor.ts` | Plain-text reader (UTF-8, with BOM stripping) | `extractTextFile` |
 | `rag/index.ts` | Module barrel | re-exports |
@@ -453,23 +525,36 @@ initAstAnalysis(): Promise<void>
 
 ```ts
 // Document lifecycle
-createDocument(args): Promise<Document>
-getDocument(id): Promise<Document | null>
-listDocuments(): Promise<Document[]>
-deleteDocument(id): Promise<void>
-findByHash(sha256): Promise<Document | null>                        // dedupe upload
-updateDocumentStatus(id, status): Promise<void>
+createDocument(buffer, name, mimeType, userId?): Promise<CreateDocumentResult>
+// throws LibraryLimitError when count ≥ 50 or bytes would exceed 500 MB
+getDocument(id, userId?): Promise<Document | null>
+listDocuments(userId?): Promise<Document[]>
+deleteDocument(id, userId?): Promise<void>
+findByHash(sha256, userId?): Promise<Document | null>               // dedupe upload
+updateDocumentStatus(id, status, errorMessage?): Promise<void>
+
+// F04 — library limits, badge colours, stuck-doc recovery
+getLibraryUsage(userId?): Promise<{ count, totalBytes, maxCount, maxBytes }>
+resetStuckDocuments(userId?): void                                  // pending → failed on restart
+assignBadgeColour(existingCount: number): string                    // BADGE_PALETTE[n % 8]
+BADGE_PALETTE: readonly string[]                                    // 8-colour hex palette
+class LibraryLimitError extends Error { code: 'LIBRARY_COUNT_LIMIT' | 'LIBRARY_STORAGE_LIMIT' }
 
 // Ingestion
-ingestDocument(args: { id, buffer, mime, filename }): Promise<void> // extract → chunk → embed
+ingestDocument(id: number): Promise<void>                           // extract → chunk → embed → graph
 
 // Retrieval
-retrieveChunks(query: string, k?: number): Promise<RetrievedChunk[]>
-formatRagContext(chunks): string                                   // → system-prompt prefix
-formatCitations(chunks): Citation[]                                // → UI panel
+retrieveChunks(query, limit?, documentIds?): Promise<RetrievedChunk[]>
+// documentIds: hard filter — excluded docs never enter the candidate pool (SQL IN clause)
+retrieveAndRerank(sessionId, query, documentIds?): Promise<RetrievedChunk[]>
+// dynamic pool: min(20 × N, 100) where N = in-scope document count
+computePoolSize(docCount: number): number                           // min(base×N, max)
+countReadyDocuments(userId?): Promise<number>                       // for pool-size calculation
+formatRagContext(chunks): string | null                             // → system-prompt prefix
+formatCitations(chunks, badgeMap?): Citation[]                     // → CitationPanel
 
 // Embedding
-generateEmbedding(text: string): Promise<number[]>                 // Ollama nomic-embed-text
+generateEmbedding(text: string): Promise<number[]>                 // Ollama nomic-embed-text (768-dim)
 class EmbeddingError extends Error { /* typed for retry logic */ }
 
 // Extraction
@@ -571,7 +656,22 @@ Full visual redesign replacing ad-hoc Tailwind classes with a purpose-built desi
 
 **Milestone**: all 95%+ coverage thresholds maintained; zero CI regressions; dark mode confirmed in browser.
 
-### F04 — Memory 🔄 next
+### F04 — Multi-Document RAG System ✅ merged
+
+Upgraded the RAG layer to handle a full document library with cross-document intelligence:
+
+- **Library limits & colour coding**: 50-document / 500 MB per-user library cap enforced server-side; each document gets a unique hex badge colour from an 8-colour palette persisted at upload time. `LibraryLimitError` returns structured `400` responses with `LIBRARY_COUNT_LIMIT` / `LIBRARY_STORAGE_LIMIT` codes.
+- **Document filter**: Users can check specific documents in the library panel; the selection is lifted to `page.tsx` state and passed to `useChat` as `documentIds[]`. The route handler converts these to a SQL `IN(...)` hard-exclude filter — unlisted documents never enter the candidate pool.
+- **Dynamic pool formula**: `min(ragDynamicPoolBase × N, ragDynamicPoolMax)` = `min(20 × N, 100)` scales retrieval breadth with library size.
+- **Cross-document graph edges**: After each retrieval, `createCrossDocumentEdges()` fires fire-and-forget SIMILAR_TO edges between chunks from different documents sharing ≥ 3 significant non-stop-word tokens, using a 50-word inlined `STOPWORDS` set to avoid NLP dependencies.
+- **Rich citations**: `Citation` interface gains `documentId`, `documentTitle`, `badgeColour`, `similarityScore`; `CitationPanel` renders a colour dot, similarity % pill, and graph score badge per source.
+- **UI additions**: `LibraryUsageBar` (count/50, MB/500 MB with warning at 80%), completion toast (pending → ready transition), per-row badge dots, 3 s polling with pending spinners, multi-file upload.
+- **Startup reset**: `resetStuckDocuments()` called at route module init to transition any interrupted-ingestion documents from `pending` to `failed`.
+- 45 new tests (document-service, retrieval-service, graph-service, multi-doc integration); 384 total passing.
+
+**Milestone**: multi-document Q&A live with colour-coded sources, cross-document graph edges, and per-document filter from the chat panel.
+
+### F05 — Memory 📋 next
 
 Persistent session memory across conversations: long-term entity & preference store, retrieved as context on each new conversation start. Schema design and retrieval heuristics are next.
 

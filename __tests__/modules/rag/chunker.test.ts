@@ -1,4 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// ingestion-pipeline.ts imports @/modules/shared/db at module level, which opens
+// the real SQLite file. Mock it out so chunkText tests remain hermetic (no file I/O).
+vi.mock('@/modules/shared/db', () => ({
+  db: {},
+  sqlite: { exec: vi.fn(), prepare: vi.fn() },
+  schema: {},
+}));
+
 import { chunkText } from '@/modules/rag/ingestion-pipeline';
 import type { ExtractedPage } from '@/modules/rag/pdf-extractor';
 

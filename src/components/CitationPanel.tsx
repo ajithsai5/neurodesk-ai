@@ -3,6 +3,10 @@
  * CitationPanel — Collapsible "Sources" section rendered below assistant messages.
  * Displays each retrieved document chunk as a [DocumentName, Page N] citation with
  * an expandable excerpt so users can verify the source passage.
+ * F004 T070 additions:
+ *  - Colour-coded badge dot using `badgeColour` hex
+ *  - Similarity percentage pill (e.g. "87%") from `similarityScore` field
+ *  - Graph score badge shown only when `graphScore` is defined
  * (Why: US4 — citations must be visible and verifiable, not just embedded in prose)
  */
 
@@ -43,21 +47,54 @@ export function CitationPanel({ citations }: Props) {
               key={i}
               className="text-xs border border-slate-200 rounded p-2 bg-slate-50"
             >
-              {/* Citation header: [DocumentName, Page N] + optional graph score badge */}
+              {/* Citation header: badge dot + [DocumentName, Page N] + score pills */}
               <div className="flex items-center justify-between gap-2">
-                <p className="font-medium text-slate-700">
-                  [{c.documentName}, Page {c.pageNumber}]
-                </p>
-                {c.graphScore !== undefined && (
-                  <span
-                    data-testid="graph-score-badge"
-                    className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-slate-500 font-mono"
-                    title="Graph relevance score"
-                  >
-                    {c.graphScore.toFixed(2)}
-                  </span>
-                )}
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {/* T070: colour-coded badge dot from BADGE_PALETTE */}
+                  {c.badgeColour && (
+                    <span
+                      data-testid="badge-dot"
+                      style={{
+                        display: 'inline-block',
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        background: c.badgeColour,
+                        flexShrink: 0,
+                      }}
+                      title={`Document colour: ${c.badgeColour}`}
+                    />
+                  )}
+                  <p className="font-medium text-slate-700 truncate">
+                    [{c.documentTitle ?? c.documentName}, Page {c.pageNumber}]
+                  </p>
+                </div>
+
+                {/* T070: score pills — similarity % and graph score */}
+                <div className="flex items-center gap-1 shrink-0">
+                  {/* Similarity percentage pill */}
+                  {c.similarityScore !== undefined && (
+                    <span
+                      data-testid="similarity-pill"
+                      className="rounded-full bg-blue-100 px-1.5 py-0.5 text-blue-700 font-mono"
+                      title={`Cosine similarity: ${(c.similarityScore * 100).toFixed(0)}%`}
+                    >
+                      {Math.round(c.similarityScore * 100)}%
+                    </span>
+                  )}
+                  {/* Graph score badge — only when present */}
+                  {c.graphScore !== undefined && (
+                    <span
+                      data-testid="graph-score-badge"
+                      className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-slate-500 font-mono"
+                      title="Graph relevance score"
+                    >
+                      {c.graphScore.toFixed(2)}
+                    </span>
+                  )}
+                </div>
               </div>
+
               {/* Excerpt — clamped to 3 lines to keep the panel compact */}
               <p className="text-slate-500 mt-1 line-clamp-3">{c.excerpt}</p>
             </li>

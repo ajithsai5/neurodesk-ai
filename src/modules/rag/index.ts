@@ -19,7 +19,14 @@
  */
 
 export { ingestDocument, chunkText } from './ingestion-pipeline';
-export { retrieveChunks, retrieveAndRerank, formatRagContext, formatCitations } from './retrieval-service';
+export {
+  retrieveChunks,
+  retrieveAndRerank,
+  formatRagContext,
+  formatCitations,
+  computePoolSize,
+  countReadyDocuments,
+} from './retrieval-service';
 export type { RetrievedChunk, Citation } from './retrieval-service';
 export {
   createDocument,
@@ -28,8 +35,19 @@ export {
   deleteDocument,
   updateDocumentStatus,
   findByHash,
+  getLibraryUsage,
+  resetStuckDocuments,
+  assignBadgeColour,
+  BADGE_PALETTE,
+  // T078: LibraryLimitError is a class — export as value so `instanceof` works outside this module
+  LibraryLimitError,
 } from './document-service';
-export type { DocumentRecord, CreateDocumentResult, DuplicateDocumentResult } from './document-service';
+export type {
+  DocumentRecord,
+  CreateDocumentResult,
+  DuplicateDocumentResult,
+  LibraryUsage,
+} from './document-service';
 export { extractPages } from './pdf-extractor';
 export type { ExtractedPage } from './pdf-extractor';
 export { extractTextFile } from './txt-extractor';

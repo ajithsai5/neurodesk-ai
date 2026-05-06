@@ -78,6 +78,9 @@ export async function writeConversationNode(
  * Write CHUNK nodes and PART_OF edges for a set of RAG document chunks.
  * Each chunk becomes a CHUNK node; a PART_OF edge links it to the first
  * MESSAGE node in the session (as a logical parent anchor).
+ *
+ * F004: accepts optional `documentTitle` per chunk — persisted to node properties
+ * so the graph can surface human-readable document names alongside chunk IDs.
  */
 export async function writeChunkNodes(
   sessionId: string,
@@ -85,6 +88,8 @@ export async function writeChunkNodes(
     id: string;
     text: string;
     documentId?: string;
+    /** F004: human-readable document title stored in node properties */
+    documentTitle?: string;
     pageNumber?: number;
     similarityScore?: number;
     retrievedAt?: number;
@@ -119,10 +124,11 @@ export async function writeChunkNodes(
         label: chunk.text.slice(0, 200), // truncate label for storage efficiency
         properties: JSON.stringify({
           chunkId: chunk.id,
-          ...(chunk.documentId !== undefined && { documentId: chunk.documentId }),
-          ...(chunk.pageNumber !== undefined && { pageNumber: chunk.pageNumber }),
+          ...(chunk.documentId    !== undefined && { documentId:    chunk.documentId }),
+          ...(chunk.documentTitle !== undefined && { documentTitle: chunk.documentTitle }),
+          ...(chunk.pageNumber    !== undefined && { pageNumber:    chunk.pageNumber }),
           ...(chunk.similarityScore !== undefined && { similarityScore: chunk.similarityScore }),
-          ...(chunk.retrievedAt !== undefined && { retrievedAt: chunk.retrievedAt }),
+          ...(chunk.retrievedAt   !== undefined && { retrievedAt:   chunk.retrievedAt }),
         }),
         createdAt: now,
       }).run();
@@ -141,6 +147,95 @@ export async function writeChunkNodes(
     }
   } catch (err) {
     logger.warn('[GraphService] writeChunkNodes failed (degraded)', { err: String(err) });
+  }
+}
+
+// ─── F004: Cross-Document Edge Detection ─────────────────────────────────────
+
+/**
+ * 50-word English stop-word set used by extractSignificantTokens.
+ * Inlined to avoid a dependency on an NLP library.
+ * (Why: token-overlap on non-stop-words is sufficient precision for tech documents)
+ */
+export const STOPWORDS: Set<string> = new Set([
+  'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+  'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been',
+  'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+  'could', 'should', 'may', 'might', 'must', 'can', 'it', 'its', 'that',
+  'this', 'these', 'those', 'not', 'no', 'as', 'if', 'so', 'then', 'than',
+]);
+
+/**
+ * Extract significant (non-stop-word) tokens from a text string.
+ * Splits on non-word characters, lowercases, filters short/stop-words.
+ * (Why: longer vocabulary tokens are more discriminative for cross-doc similarity)
+ */
+export function extractSignificantTokens(text: string): Set<string> {
+  const tokens = text
+    .toLowerCase()
+    .split(/\W+/)
+    .filter((t) => t.length > 2 && !STOPWORDS.has(t));
+  return new Set(tokens);
+}
+
+/**
+ * Create `SIMILAR_TO` edges between chunks from different documents that share
+ * ≥ 3 non-stop-word tokens (token-overlap / Jaccard threshold).
+ *
+ * This is a fire-and-forget operation: errors are caught and logged, never thrown.
+ * Called from `retrieveAndRerank` after `writeChunkNodes`.
+ *
+ * @param sessionId - Current session identifier
+ * @param chunks    - Candidate chunks with id, text, and numeric documentId
+ */
+export async function createCrossDocumentEdges(
+  sessionId: string,
+  chunks: Array<{ id: string; text: string; documentId: number }>,
+): Promise<void> {
+  if (chunks.length < 2) return;
+
+  try {
+    const now = Date.now();
+    // Pre-compute significant token sets per chunk
+    const tokenSets = chunks.map((c) => extractSignificantTokens(c.text));
+
+    // Check every pair (O(n²) — pool is bounded at 100, so max 4950 pairs)
+    for (let i = 0; i < chunks.length; i++) {
+      for (let j = i + 1; j < chunks.length; j++) {
+        const chunkA = chunks[i]!;
+        const chunkB = chunks[j]!;
+
+        // Skip same-document pairs (no cross-document signal)
+        if (chunkA.documentId === chunkB.documentId) continue;
+
+        // Count shared significant tokens
+        const setA = tokenSets[i]!;
+        const setB = tokenSets[j]!;
+        let sharedCount = 0;
+        for (const token of setA) {
+          if (setB.has(token)) sharedCount++;
+        }
+
+        if (sharedCount < 3) continue;
+
+        // Insert SIMILAR_TO edge with metadata
+        db.insert(schema.graphEdges).values({
+          id: uuidv4(),
+          sourceId: chunkA.id,
+          targetId: chunkB.id,
+          relationship: 'SIMILAR_TO',
+          weight: sharedCount / Math.max(setA.size, setB.size, 1), // Jaccard weight
+          properties: JSON.stringify({ isCrossDocument: true, sharedTokenCount: sharedCount }),
+          createdAt: now,
+        }).run();
+      }
+    }
+  } catch (err) {
+    // Fire-and-forget: log but never surface errors to the caller
+    logger.warn('[GraphService] createCrossDocumentEdges failed (degraded)', {
+      sessionId,
+      err: String(err),
+    });
   }
 }
 
